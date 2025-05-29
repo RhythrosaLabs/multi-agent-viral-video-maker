@@ -285,12 +285,12 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                     "text": cleaned_naration,
                     "voice_id": voice_options[selected_voice],
                     "emotion": selected_emotion,
-                    "speed": 1.05,
+                    "speed": 1.1,
                     "pitch": 0,
                     "volume": 1,
                     "bitrate": 128000,
                     "channel": "mono",
-                    "sample_rate": 44100,
+                    "sample_rate": 32000,
                     "language_boost": "English",
                     "english_normalization": True
                 },
@@ -345,7 +345,8 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                 import numpy as np
                 sr = int(voice_clip.fps)
                 silence_duration = final_duration - voice_clip.duration
-                silence = np.zeros(int(silence_duration * sr))
+                # Ensure silence is 2D: (samples, 1) for mono
+                silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
                 silence_clip = AudioArrayClip(silence, fps=sr)
                 voice_clip = concatenate_audioclips([voice_clip, silence_clip])
             # If exactly matches, do nothing
@@ -390,6 +391,40 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         # Display the final video and provide a download button
         st.video(output_path)
         st.download_button("📽 Download Final Video", output_path, "final_video.mp4")
+
+        # --- Create a zip file with all assets and provide a download button ---
+        import zipfile
+        asset_paths = []
+        asset_names = []
+
+        # Add script
+        if os.path.exists(script_file_path):
+            asset_paths.append(script_file_path)
+            asset_names.append("script.txt")
+        # Add video segments
+        for idx, seg_path in enumerate(temp_video_paths):
+            if os.path.exists(seg_path):
+                asset_paths.append(seg_path)
+                asset_names.append(f"segment_{idx+1}.mp4")
+        # Add voiceover
+        if voice_path and os.path.exists(voice_path):
+            asset_paths.append(voice_path)
+            asset_names.append("voiceover.mp3")
+        # Add music
+        if music_path and os.path.exists(music_path):
+            asset_paths.append(music_path)
+            asset_names.append("background_music.mp3")
+        # Add final video
+        if os.path.exists(output_path):
+            asset_paths.append(output_path)
+            asset_names.append("final_video.mp4")
+
+        # Create zip file
+        zip_path = tempfile.NamedTemporaryFile(delete=False, suffix=".zip").name
+        with zipfile.ZipFile(zip_path, "w") as zipf:
+            for file_path, arcname in zip(asset_paths, asset_names):
+                zipf.write(file_path, arcname=arcname)
+        st.download_button("🗜 Download All Assets (ZIP)", zip_path, "video_assets.zip")
 
     except Exception as e:
         st.warning("Final video merge failed, but you can still download individual assets.")
