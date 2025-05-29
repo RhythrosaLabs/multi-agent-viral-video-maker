@@ -10,6 +10,7 @@ A powerful and flexible web app built with **Streamlit**, **Replicate**, and **M
 - 🎤 **Voiceover Narration** with a variety of AI voice options and emotions
 - 🎥 **Visual Scene Creation** tailored to your script
 - 🖼️ **Customizable Video Styles** (Documentary, Cinematic, Nature, etc.)
+- 🎹 **AI Generated Background Music**
 - 🔊 **Optional Voiceover and Audio Mixing**
 - 📐 **Aspect Ratios:** 16:9, 9:16, 1:1, 4:3
 - 🎚️ **Video Lengths:** 10s, 15s, or 20s
@@ -70,18 +71,11 @@ The app will:
 - Write a script using Claude-4 Sonnet
 - Generate scenes for each script segment
 - Add voiceover narration (optional)
+- Compose and add music
 - Concatenate video and audio into one final video
-- Let you download the script and generated video
+- Let you download the full video and all individual elements (such as script, voiceover, music, etc.)
 
----
 
-## 📦 Dependencies
-
-- [Streamlit](https://streamlit.io/)
-- [Replicate](https://replicate.com/)
-- [MoviePy](https://zulko.github.io/moviepy/)
-- [Requests](https://docs.python-requests.org/en/latest/)
-- [FFmpeg](https://ffmpeg.org/) (required for video/audio encoding)
 
 ---
 
@@ -91,34 +85,3 @@ The app will:
 app.py                  # Main Streamlit app
 requirements.txt        # Python dependencies
 README.md               # You're here!
-```
-
----
-
-## 🧠 Roadmap & Ideas
-
-- Add background music track options
-- Upload custom voice files or images
-- Extend to long-form or YouTube-ready videos
-- Add subtitle/caption generation
-- Integrate Stable Diffusion or SDXL for enhanced visuals
-- Support multiple languages and TTS providers
-
----
-
-## ⚠️ Disclaimer
-
-This app uses third-party AI APIs which may generate unpredictable or biased outputs. Always review generated content before sharing or publishing.
-
----
-
-## 📝 License
-
-MIT License. See [LICENSE](LICENSE) for details.
-
----
-
-## 👨‍💻 Author
-
-Developed by [Your Name](https://github.com/yourusername).  
-Feel free to open issues, fork, and contribute!
