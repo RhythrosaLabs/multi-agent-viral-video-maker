@@ -36,7 +36,7 @@ cd ai-multi-agent-video-creator
 
 2. **Install dependencies**
 
-We recommend using a virtual environment:
+It is typically best practice to use a virtual environment:
 
 ```bash
 python -m venv venv
