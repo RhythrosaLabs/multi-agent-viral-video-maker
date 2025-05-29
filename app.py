@@ -339,9 +339,16 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             voice_clip = voice_clip.volumex(voice_volume)
             if voice_clip.duration > final_duration:
                 voice_clip = voice_clip.subclip(0, final_duration)
-            else:
-                # If shorter, start at 0 (do not center), so it plays from the beginning
-                voice_clip = voice_clip.set_start(0)
+            elif voice_clip.duration < final_duration:
+                # Pad the voiceover with silence at the end to match video duration
+                from moviepy.audio.AudioClip import AudioArrayClip
+                import numpy as np
+                sr = int(voice_clip.fps)
+                silence_duration = final_duration - voice_clip.duration
+                silence = np.zeros(int(silence_duration * sr))
+                silence_clip = AudioArrayClip(silence, fps=sr)
+                voice_clip = concatenate_audioclips([voice_clip, silence_clip])
+            # If exactly matches, do nothing
             audio_clips.append(voice_clip)
 
         if music_path:
