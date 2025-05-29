@@ -339,17 +339,17 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             voice_clip = voice_clip.volumex(voice_volume)
             if voice_clip.duration > final_duration:
                 voice_clip = voice_clip.subclip(0, final_duration)
-            elif voice_clip.duration < final_duration:
-                # Center the voice in the timeline if it's shorter than the video
-                voice_start = (final_duration - voice_clip.duration) / 2
-                voice_clip = voice_clip.set_start(voice_start)
+            else:
+                # If shorter, start at 0 (do not center), so it plays from the beginning
+                voice_clip = voice_clip.set_start(0)
             audio_clips.append(voice_clip)
 
         if music_path:
             # Load music clip, set volume, add fade in/out, and loop/trim to match video duration
             music_clip = AudioFileClip(music_path)
             music_volume = 0.2  # Lower music volume for better voice clarity
-            music_clip = music_clip.volumex(music_volume).audio_fadein(1).audio_fadeout(1)
+            # Apply 0.5s fade in and 2.5s fade out
+            music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
             if music_clip.duration < final_duration:
                 # Loop music if its duration is less than the video's
                 loops_needed = int(final_duration / music_clip.duration) + 1
