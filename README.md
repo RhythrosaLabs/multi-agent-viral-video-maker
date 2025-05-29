@@ -1,5 +1,10 @@
 # 🎬 AI Multi-Agent Video Creator
 
+Explore the UI:
+
+https://viral-video-maker.streamlit.app
+
+
 A powerful and flexible web app built with **Streamlit**, **Replicate**, and **MoviePy** that enables you to generate short educational or cinematic videos automatically. Simply enter a topic, configure settings, and let AI agents handle everything from scriptwriting to video generation and narration.
 
 ---
