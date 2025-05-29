@@ -44,8 +44,6 @@ source venv/bin/activate  # on Windows: venv\Scripts\activate
 pip install -r requirements.txt
 ```
 
-> 📦 Make sure you have `ffmpeg` installed for MoviePy to process videos.
-
 3. **Set up your Replicate API key**
 
 You can get your API key from [replicate.com/account](https://replicate.com/account).
