@@ -11,12 +11,12 @@ A powerful and flexible web app built with **Streamlit**, **Replicate**, and **M
 
 ## 🚀 Features
 
-- ✍️ **AI Script Generation** using Replicate (Claude-4 Sonnet)
-- 🎤 **Voiceover Narration** with a variety of AI voice options and emotions
-- 🎥 **Visual Scene Creation** tailored to your script
-- 🖼️ **Customizable Video Styles** (Documentary, Cinematic, Nature, etc.)
-- 🎹 **AI Generated Background Music**
+- ✍️ **Script Generation** using Claude-4 Sonnet
+- 🎤 **Voiceover Narration** using Minimax Speech O2
+- 🎥 **Visual Scene Creation** using Luma Ray 2
+- 🎹 **Background Music** using Google Lyria
 - 🔊 **Optional Voiceover and Audio Mixing**
+- 🖼️ **Customizable Video Styles** (Documentary, Cinematic, Nature, etc.)
 - 📐 **Aspect Ratios:** 16:9, 9:16, 1:1, 4:3
 - 🎚️ **Video Lengths:** 10s, 15s, or 20s
 - 🕹️ **Camera Motions:** Randomized movements like zooms, pans, orbit, etc.
