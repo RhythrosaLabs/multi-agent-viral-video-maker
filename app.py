@@ -207,7 +207,6 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     # Ensure we only take the exact number of required segments
     script_segments = script_segments[:num_segments]
 
-
     st.success("Script written successfully")
     # Save the script to a temporary file and provide a download button
     script_file_path = tempfile.NamedTemporaryFile(delete=False, suffix=".txt").name
@@ -270,19 +269,50 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             st.error(f"Failed to generate or download segment {i+1} video: {e}")
             st.stop() # Stop execution if a segment video fails to generate
 
-    voice_path = None # Initialize voice_path to None
+    # Step 3: Concatenate video segments first
+    st.info("Step 3: Combining video segments")
+    try:
+        # Concatenate all generated video clips
+        final_video = concatenate_videoclips(segment_clips, method="compose")
+        # Ensure the final video duration matches the selected total length
+        final_video = final_video.set_duration(total_video_duration)
+        final_duration = final_video.duration
+        st.success(f"Video segments combined - Total duration: {final_duration} seconds")
+    except Exception as e:
+        st.error(f"Failed to combine video segments: {e}")
+        st.stop()
+
+    # Step 4: Generate background music
+    st.info("Step 4: Creating background music")
+    music_path = None
+    try:
+        # Run the music generation model
+        music_uri = run_replicate(
+            "google/lyria-2",
+            {"prompt": f"Background music for a cohesive, {total_video_duration}-second educational video about {video_topic}. Light, non-distracting, slightly cinematic tone."},
+        )
+        # Download the generated music
+        music_path = download_to_file(music_uri, suffix=".mp3")
+        # Display the music and provide a download button
+        st.audio(music_path)
+        st.download_button("🎵 Download Background Music", music_path, "background_music.mp3")
+    except Exception as e:
+        st.error(f"Failed to generate or download music: {e}")
+        music_path = None # Set to None if generation fails
+
+    # Step 5: Generate voiceover narration LAST (after video is finalized)
+    voice_path = None
     if include_voiceover:
-        # Step 4: Generate voiceover narration if the checkbox is selected
-        st.info(f"Step 4: Generating voiceover narration with {selected_voice} voice")
+        st.info(f"Step 5: Generating voiceover narration with {selected_voice} voice")
         full_narration = " ".join(script_segments)
         # Remove punctuation and special characters from the narration for cleaner VoiceOver
-        cleaned_naration = re.sub(r'[^\w\s]', '', full_narration)
+        cleaned_narration = re.sub(r'[^\w\s]', '', full_narration)
         try:
             # Run the speech generation model
             voiceover_uri = run_replicate(
                 "minimax/speech-02-hd",
                 {
-                    "text": cleaned_naration,
+                    "text": cleaned_narration,
                     "voice_id": voice_options[selected_voice],
                     "emotion": selected_emotion,
                     "speed": 1.1,
@@ -304,68 +334,53 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             st.error(f"Failed to generate or download voiceover: {e}")
             voice_path = None # Set to None if generation fails, so it's not used later
 
-    music_path = None # Initialize music_path to None
-    # Step 5: Generate background music
-    st.info("Step 5: Creating background music")
-    try:
-        # Run the music generation model
-        music_uri = run_replicate(
-            "google/lyria-2",
-            {"prompt": f"Background music for a cohesive, {total_video_duration}-second educational video about {video_topic}. Light, non-distracting, slightly cinematic tone."},
-        )
-        # Download the generated music
-        music_path = download_to_file(music_uri, suffix=".mp3")
-        # Display the music and provide a download button
-        st.audio(music_path)
-        st.download_button("🎵 Download Background Music", music_path, "background_music.mp3")
-    except Exception as e:
-        st.error(f"Failed to generate or download music: {e}")
-        music_path = None # Set to None if generation fails
-
-    # Step 6: Merge audio and video
+    # Step 6: Merge all audio with video
     st.info("Step 6: Merging final audio and video")
     try:
-        # Concatenate all generated video clips
-        final_video = concatenate_videoclips(segment_clips, method="compose")
-        # Ensure the final video duration matches the selected total length
-        final_video = final_video.set_duration(total_video_duration)
-        final_duration = final_video.duration
-
         audio_clips = []
+        
+        # Handle voiceover audio - fit exactly to video duration
         if voice_path:
-            # Load voice clip, set volume, and adjust duration to match video
             voice_clip = AudioFileClip(voice_path)
             voice_volume = 1.0
             voice_clip = voice_clip.volumex(voice_volume)
+            
+            # Fit voiceover to exact video duration
             if voice_clip.duration > final_duration:
+                # Trim if too long (from the end to preserve beginning)
                 voice_clip = voice_clip.subclip(0, final_duration)
             elif voice_clip.duration < final_duration:
-                # Pad the voiceover with silence at the end to match video duration
+                # Pad with silence at the end if too short
                 from moviepy.audio.AudioClip import AudioArrayClip
                 import numpy as np
                 sr = int(voice_clip.fps)
                 silence_duration = final_duration - voice_clip.duration
-                # Ensure silence is 2D: (samples, 1) for mono
+                # Create silence: (samples, 1) for mono
                 silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
                 silence_clip = AudioArrayClip(silence, fps=sr)
                 voice_clip = concatenate_audioclips([voice_clip, silence_clip])
-            # If exactly matches, do nothing
+            
             audio_clips.append(voice_clip)
 
+        # Handle background music - fit exactly to video duration
         if music_path:
-            # Load music clip, set volume, add fade in/out, and loop/trim to match video duration
             music_clip = AudioFileClip(music_path)
             music_volume = 0.2  # Lower music volume for better voice clarity
-            # Apply 0.5s fade in and 2.5s fade out
+            # Apply fade effects
             music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
+            
+            # Fit music to exact video duration
             if music_clip.duration < final_duration:
-                # Loop music if its duration is less than the video's
+                # Loop music if it's shorter than video
                 loops_needed = int(final_duration / music_clip.duration) + 1
                 music_clips_looped = [music_clip] * loops_needed
-                music_clip = concatenate_audioclips(music_clips_looped).subclip(0, final_duration)
-            elif music_clip.duration > final_duration:
-                # Trim music if its duration is greater than the video's
+                music_clip = concatenate_audioclips(music_clips_looped)
+                # Trim to exact duration after looping
                 music_clip = music_clip.subclip(0, final_duration)
+            elif music_clip.duration > final_duration:
+                # Trim from beginning to preserve the natural ending
+                music_clip = music_clip.subclip(0, final_duration)
+            
             audio_clips.append(music_clip)
 
         # Composite all audio clips if any exist, otherwise set no audio
