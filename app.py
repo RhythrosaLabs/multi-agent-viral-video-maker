@@ -197,6 +197,15 @@ selected_concepts = st.multiselect(
     help="Select camera movements to make your video more dynamic"
 )
 
+# Helper function to sanitize string for API calls
+def sanitize_for_api(text_string):
+    """Encodes a string to ASCII, ignoring errors, then decodes back to string.
+    This removes any non-ASCII characters that might cause UnicodeEncodeError."""
+    if isinstance(text_string, str):
+        return text_string.encode('ascii', 'ignore').decode('ascii')
+    return str(text_string).encode('ascii', 'ignore').decode('ascii')
+
+
 # Main generation button, dynamically displays the selected video length
 if replicate_api_key and video_topic and st.button(f"Generate {video_length_option} Video"):
     # Initialize Replicate client with the provided API key
@@ -218,10 +227,13 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
 
     # Step 1: Write the cohesive script for the full video
     st.info(f"Step 1: Writing cohesive script for {total_video_duration}-second {video_category} video")
+    
+    # Sanitize the prompt before sending to Replicate
+    sanitized_script_prompt = sanitize_for_api(script_prompt_template.format(video_topic=video_topic))
     full_script = run_replicate(
         "anthropic/claude-4-sonnet",
         {
-            "prompt": script_prompt_template.format(video_topic=video_topic)
+            "prompt": sanitized_script_prompt
         },
     )
 
@@ -259,11 +271,13 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             voice_path = None
         else:
             try:
+                # Sanitize the narration text before sending to Replicate
+                sanitized_narration_text = sanitize_for_api(cleaned_narration)
                 # Run the speech generation model - NOW USING 'minimax/speech-02-turbo'
                 voiceover_uri = run_replicate(
                     "minimax/speech-02-turbo",
                     {
-                        "text": cleaned_narration,
+                        "text": sanitized_narration_text,
                         "voice_id": voice_options[selected_voice],
                         "emotion": selected_emotion,
                         "speed": 1.1,
@@ -311,12 +325,15 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
 
         # Construct the video generation prompt using the category-specific visual style
         video_prompt = f"Cinematic {shot_type} for {video_visual_style_prompt.format(video_topic=video_topic)}. Visual content: {segment}."
+        
+        # Sanitize the video prompt before sending to Replicate
+        sanitized_video_prompt = sanitize_for_api(video_prompt)
         try:
             # Run the video generation model
             video_uri = run_replicate(
                 "luma/ray-flash-2-540p",
                 {
-                    "prompt": video_prompt,
+                    "prompt": sanitized_video_prompt,
                     "num_frames": num_frames,
                     "fps": 24,
                     "guidance": 3.0,  # Higher guidance for better prompt adherence
@@ -355,10 +372,12 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     st.info("Step 5: Creating background music")
     music_path = None
     try:
+        # Sanitize the music prompt before sending to Replicate
+        sanitized_music_prompt = sanitize_for_api(music_style_prompt.format(video_topic=video_topic))
         # Run the music generation model
         music_uri = run_replicate(
             "google/lyria-2",
-            {"prompt": music_style_prompt.format(video_topic=video_topic)},
+            {"prompt": sanitized_music_prompt},
         )
         # Download the generated music
         music_path = download_to_file(music_uri, suffix=".mp3")
