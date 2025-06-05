@@ -335,9 +335,9 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             voice_path = None
         else:
             try:
-                # Run the speech generation model
+                # Run the speech generation model - CHANGED TO 'minimax/speech-02-turbo'
                 voiceover_uri = run_replicate(
-                    "minimax/speech-02-hd",
+                    "minimax/speech-02-turbo",
                     {
                         "text": cleaned_narration,
                         "voice_id": voice_options[selected_voice],
@@ -387,7 +387,6 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                 elif voice_clip.duration < final_duration:
                     # Pad with silence at the end if too short
                     from moviepy.audio.AudioClip import AudioArrayClip
-                    # import numpy as np # Already imported at the top
                     sr = int(voice_clip.fps)
                     silence_duration = final_duration - voice_clip.duration
                     # Create silence: (samples, 1) for mono
