@@ -20,7 +20,7 @@ st.title("AI Multi-Agent Video Creator")
 
 # Input fields for Replicate API Key and video topic
 replicate_api_key = st.text_input("Enter your Replicate API Key", type="password")
-video_topic = st.text_input("Enter a video topic (e.g., 'Why the Earth rotates')")
+video_topic = st.text_input("Enter a video topic (e.g., 'Why the Earth rotates' for Educational, 'New running shoes' for Advertisement, 'A dystopian future' for Movie Trailer)")
 
 # Dictionary mapping display names to Replicate voice IDs
 voice_options = {
@@ -52,6 +52,13 @@ st.subheader("Video Settings")
 col1, col2, col3 = st.columns(3)
 
 with col1:
+    # New selectbox for video category
+    video_category = st.selectbox(
+        "Video Category:",
+        ["Educational", "Advertisement", "Movie Trailer"],
+        help="Choose the category for your video, influencing script and visual style."
+    )
+    
     # Selectbox for video style
     video_style = st.selectbox(
         "Video Style:",
@@ -118,46 +125,58 @@ with col_audio2:
 total_video_duration = 0
 num_segments = 0
 script_prompt_template = ""
+video_visual_style_prompt = ""
+music_style_prompt = ""
 
+# Base prompt for script generation, will be modified by category
+base_script_prompt = ""
 if video_length_option == "10 seconds":
     num_segments = 2
     total_video_duration = 10
-    # Script prompt for a super short, 10-second video
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
-        f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. "
-        f"Each segment should be 5-8 words. "
-        f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
-        f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
-        f"Label each section clearly as '1:', and '2:'. "
-        f"Write in an engaging, conversational tone that keeps viewers hooked. Avoid generic statements."
-    )
+    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be 5-8 words. Label each section clearly as '1:', and '2:'. "
 elif video_length_option == "15 seconds":
     num_segments = 3
     total_video_duration = 15
-    # Script prompt for a short, 15-second video
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
-        f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. "
-        f"Each segment should be 6-10 words. "
-        f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
-        f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
-        f"Label each section clearly as '1:', '2:', and '3:'. "
-        f"Write in an engaging, conversational tone that keeps viewers hooked. Avoid generic statements."
-    )
+    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be 6-10 words. Label each section clearly as '1:', '2:', and '3:'. "
 else: # Default to 20 seconds
     num_segments = 4
     total_video_duration = 20
-    # Script prompt for a 20-second video
+    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be 6-10 words. Label each section clearly as '1:', '2:', '3:', and '4:'. "
+
+# Adjust prompts based on video category
+if video_category == "Educational":
     script_prompt_template = (
         f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
-        f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. "
-        f"Each segment should be 6-10 words. "
+        f"{base_script_prompt}"
         f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
         f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
-        f"Label each section clearly as '1:', '2:', '3:', and '4:'. "
         f"Write in an engaging, conversational tone that keeps viewers hooked. Avoid generic statements."
     )
+    video_visual_style_prompt = f"educational video about '{{video_topic}}'. Style: {video_style.lower()}, clean, professional, well-lit. Camera movement: smooth, purposeful. No text overlays."
+    music_style_prompt = f"Background music for a cohesive, {total_video_duration}-second educational video about {{video_topic}}. Light, non-distracting, slightly cinematic tone."
+
+elif video_category == "Advertisement":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a compelling, persuasive script for a {total_video_duration}-second **advertisement** about '{{video_topic}}'. "
+        f"{base_script_prompt}"
+        f"Focus on benefits, problem-solution, and a clear call to action. Each segment should highlight a key feature, benefit, or evoke a positive emotion. "
+        f"The final segment should include a strong call to action (e.g., 'Learn more at...', 'Buy now!', 'Visit our website!'). "
+        f"Use a professional, enticing, and slightly urgent tone. Avoid generic statements."
+    )
+    video_visual_style_prompt = f"dynamic, visually appealing shots for a product/service advertisement about '{{video_topic}}'. Highlight features. Style: modern, vibrant, clean, commercial-ready. Camera movement: engaging, product-focused. No text overlays."
+    music_style_prompt = f"Upbeat, modern, and catchy background music for a commercial advertisement about {{video_topic}}. Energetic and positive tone."
+
+elif video_category == "Movie Trailer":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a dramatic, suspenseful script for a {total_video_duration}-second **movie trailer** for a film titled '{{video_topic}}'. "
+        f"{base_script_prompt}"
+        f"Each segment should introduce elements of the plot, characters, or rising conflict, building suspense. "
+        f"The final segment should be a compelling, open-ended hook that leaves the audience wanting more. "
+        f"Use evocative language, questions, and a fast-paced, intense tone. Build anticipation."
+    )
+    video_visual_style_prompt = f"epic, dramatic, cinematic shots for a movie trailer about '{{video_topic}}'. Emphasize tension, conflict, character expressions. Style: dark, moody, high-contrast, blockbuster film. Camera movement: intense, sweeping, purposeful. No text overlays."
+    music_style_prompt = f"Dramatic, suspenseful, and epic background music for a movie trailer about {{video_topic}}. Build tension and excitement with orchestral elements."
+
 
 # Section for Camera Movement options
 st.subheader("Camera Movement (Optional)")
@@ -187,7 +206,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         return replicate_client.run(model_path, input=input_data)
 
     # Step 1: Write the cohesive script for the full video
-    st.info(f"Step 1: Writing cohesive script for {total_video_duration}-second video")
+    st.info(f"Step 1: Writing cohesive script for {total_video_duration}-second {video_category} video")
     full_script = run_replicate(
         "anthropic/claude-4-sonnet",
         {
@@ -240,8 +259,8 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         else: # For the last segment or if fewer segments, make it a concluding shot
             shot_type = "dynamic concluding shot"
 
-        # Construct the video generation prompt
-        video_prompt = f"Cinematic {shot_type} for educational video about '{video_topic}'. Visual content: {segment}. Style: {video_style.lower()}, clean, professional, well-lit. Camera movement: smooth, purposeful. No text overlays."
+        # Construct the video generation prompt using the category-specific visual style
+        video_prompt = f"Cinematic {shot_type} for {video_visual_style_prompt.format(video_topic=video_topic)}. Visual content: {segment}."
         try:
             # Run the video generation model
             video_uri = run_replicate(
@@ -289,7 +308,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         # Run the music generation model
         music_uri = run_replicate(
             "google/lyria-2",
-            {"prompt": f"Background music for a cohesive, {total_video_duration}-second educational video about {video_topic}. Light, non-distracting, slightly cinematic tone."},
+            {"prompt": music_style_prompt.format(video_topic=video_topic)},
         )
         # Download the generated music
         music_path = download_to_file(music_uri, suffix=".mp3")
@@ -359,7 +378,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                 silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
                 silence_clip = AudioArrayClip(silence, fps=sr)
                 voice_clip = concatenate_audioclips([voice_clip, silence_clip])
-            
+                
             audio_clips.append(voice_clip)
 
         # Handle background music - fit exactly to video duration
@@ -380,7 +399,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             elif music_clip.duration > final_duration:
                 # Trim from beginning to preserve the natural ending
                 music_clip = music_clip.subclip(0, final_duration)
-            
+                
             audio_clips.append(music_clip)
 
         # Composite all audio clips if any exist, otherwise set no audio
