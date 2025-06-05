@@ -11,6 +11,7 @@ from moviepy.editor import (
     CompositeAudioClip,
     concatenate_audioclips,
 )
+import numpy as np # Import numpy for AudioArrayClip silence generation
 
 # Set Streamlit page configuration for a wider layout and custom title
 st.set_page_config(layout="wide", page_title="AI Multi-Agent Video Creator")
@@ -325,33 +326,47 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         st.info(f"Step 5: Generating voiceover narration with {selected_voice} voice")
         full_narration = " ".join(script_segments)
         # Remove punctuation and special characters from the narration for cleaner VoiceOver
-        cleaned_narration = re.sub(r'[^\w\s]', '', full_narration)
-        try:
-            # Run the speech generation model
-            voiceover_uri = run_replicate(
-                "minimax/speech-02-hd",
-                {
-                    "text": cleaned_narration,
-                    "voice_id": voice_options[selected_voice],
-                    "emotion": selected_emotion,
-                    "speed": 1.1,
-                    "pitch": 0,
-                    "volume": 1,
-                    "bitrate": 128000,
-                    "channel": "mono",
-                    "sample_rate": 32000,
-                    "language_boost": "English",
-                    "english_normalization": True
-                },
-            )
-            # Download the generated voiceover
-            voice_path = download_to_file(voiceover_uri, suffix=".mp3")
-            # Display the voiceover and provide a download button
-            st.audio(voice_path)
-            st.download_button("🎙 Download Voiceover", voice_path, "voiceover.mp3")
-        except Exception as e:
-            st.error(f"Failed to generate or download voiceover: {e}")
-            voice_path = None # Set to None if generation fails, so it's not used later
+        # Keep common punctuation marks like periods, commas, question marks, exclamation marks
+        cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_narration)
+        
+        # Add a check for empty narration after cleaning
+        if not cleaned_narration.strip():
+            st.warning("Voiceover script became empty after cleaning. Skipping voiceover generation.")
+            voice_path = None
+        else:
+            try:
+                # Run the speech generation model
+                voiceover_uri = run_replicate(
+                    "minimax/speech-02-hd",
+                    {
+                        "text": cleaned_narration,
+                        "voice_id": voice_options[selected_voice],
+                        "emotion": selected_emotion,
+                        "speed": 1.1,
+                        "pitch": 0,
+                        "volume": 1,
+                        "bitrate": 128000,
+                        "channel": "mono",
+                        "sample_rate": 32000,
+                        "language_boost": "English",
+                        "english_normalization": True
+                    },
+                )
+                # Download the generated voiceover
+                voice_path = download_to_file(voiceover_uri, suffix=".mp3")
+
+                # Validate if the downloaded voiceover file is empty or missing
+                if not os.path.exists(voice_path) or os.path.getsize(voice_path) == 0:
+                    st.error("Generated voiceover file is empty or missing. It might not have generated correctly on Replicate's side.")
+                    voice_path = None
+                else:
+                    # Display the voiceover and provide a download button
+                    st.audio(voice_path)
+                    st.download_button("🎙 Download Voiceover", voice_path, "voiceover.mp3")
+
+            except Exception as e:
+                st.error(f"Failed to generate or download voiceover: {e}")
+                voice_path = None # Set to None if generation fails, so it's not used later
 
     # Step 6: Merge all audio with video
     st.info("Step 6: Merging final audio and video")
@@ -360,47 +375,55 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         
         # Handle voiceover audio - fit exactly to video duration
         if voice_path:
-            voice_clip = AudioFileClip(voice_path)
-            voice_volume = 1.0
-            voice_clip = voice_clip.volumex(voice_volume)
-            
-            # Fit voiceover to exact video duration
-            if voice_clip.duration > final_duration:
-                # Trim if too long (from the end to preserve beginning)
-                voice_clip = voice_clip.subclip(0, final_duration)
-            elif voice_clip.duration < final_duration:
-                # Pad with silence at the end if too short
-                from moviepy.audio.AudioClip import AudioArrayClip
-                import numpy as np
-                sr = int(voice_clip.fps)
-                silence_duration = final_duration - voice_clip.duration
-                # Create silence: (samples, 1) for mono
-                silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
-                silence_clip = AudioArrayClip(silence, fps=sr)
-                voice_clip = concatenate_audioclips([voice_clip, silence_clip])
+            try:
+                voice_clip = AudioFileClip(voice_path)
+                voice_volume = 1.0
+                voice_clip = voice_clip.volumex(voice_volume)
                 
-            audio_clips.append(voice_clip)
+                # Fit voiceover to exact video duration
+                if voice_clip.duration > final_duration:
+                    # Trim if too long (from the end to preserve beginning)
+                    voice_clip = voice_clip.subclip(0, final_duration)
+                elif voice_clip.duration < final_duration:
+                    # Pad with silence at the end if too short
+                    from moviepy.audio.AudioClip import AudioArrayClip
+                    # import numpy as np # Already imported at the top
+                    sr = int(voice_clip.fps)
+                    silence_duration = final_duration - voice_clip.duration
+                    # Create silence: (samples, 1) for mono
+                    silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
+                    silence_clip = AudioArrayClip(silence, fps=sr)
+                    voice_clip = concatenate_audioclips([voice_clip, silence_clip])
+                    
+                audio_clips.append(voice_clip)
+            except Exception as e:
+                st.error(f"Error loading or processing voiceover audio clip: {e}")
+                voice_path = None # Ensure it's not used further if there's an issue
 
         # Handle background music - fit exactly to video duration
         if music_path:
-            music_clip = AudioFileClip(music_path)
-            music_volume = 0.2  # Lower music volume for better voice clarity
-            # Apply fade effects
-            music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
-            
-            # Fit music to exact video duration
-            if music_clip.duration < final_duration:
-                # Loop music if it's shorter than video
-                loops_needed = int(final_duration / music_clip.duration) + 1
-                music_clips_looped = [music_clip] * loops_needed
-                music_clip = concatenate_audioclips(music_clips_looped)
-                # Trim to exact duration after looping
-                music_clip = music_clip.subclip(0, final_duration)
-            elif music_clip.duration > final_duration:
-                # Trim from beginning to preserve the natural ending
-                music_clip = music_clip.subclip(0, final_duration)
+            try:
+                music_clip = AudioFileClip(music_path)
+                music_volume = 0.2  # Lower music volume for better voice clarity
+                # Apply fade effects
+                music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
                 
-            audio_clips.append(music_clip)
+                # Fit music to exact video duration
+                if music_clip.duration < final_duration:
+                    # Loop music if it's shorter than video
+                    loops_needed = int(final_duration / music_clip.duration) + 1
+                    music_clips_looped = [music_clip] * loops_needed
+                    music_clip = concatenate_audioclips(music_clips_looped)
+                    # Trim to exact duration after looping
+                    music_clip = music_clip.subclip(0, final_duration)
+                elif music_clip.duration > final_duration:
+                    # Trim from beginning to preserve the natural ending
+                    music_clip = music_clip.subclip(0, final_duration)
+                    
+                audio_clips.append(music_clip)
+            except Exception as e:
+                st.error(f"Error loading or processing background music clip: {e}")
+                music_path = None # Ensure it's not used further if there's an issue
 
         # Composite all audio clips if any exist, otherwise set no audio
         if audio_clips:
