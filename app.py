@@ -11,7 +11,7 @@ from moviepy.editor import (
     CompositeAudioClip,
     concatenate_audioclips,
 )
-import numpy as np # Import numpy for AudioArrayClip silence generation
+import numpy as np
 
 # Set Streamlit page configuration for a wider layout and custom title
 st.set_page_config(layout="wide", page_title="AI Multi-Agent Video Creator")
@@ -27,6 +27,107 @@ def sanitize_for_api(text_string):
         return text_string.encode('ascii', 'ignore').decode('ascii')
     return str(text_string).encode('ascii', 'ignore').decode('ascii')
 
+# --- Model Configurations and Pricing ---
+# Prices are approximate and based on Replicate's public pricing as of latest search.
+# Prices are typically per million tokens for text, per second or per run for others.
+MODEL_CONFIGS = {
+    "text": {
+        "anthropic/claude-4-sonnet": {
+            "name": "Claude 4 Sonnet",
+            "model_id": "anthropic/claude-4-sonnet",
+            "input_cost_per_million_tokens": 3.00,
+            "output_cost_per_million_tokens": 15.00,
+            "avg_output_tokens_per_run": 700, # Estimated avg output tokens for a script
+            "parameters": {}
+        },
+        "openai/gpt-4.1-nano": {
+            "name": "GPT-4.1 Nano",
+            "model_id": "openai/gpt-4.1-nano",
+            "input_cost_per_million_tokens": 0.10,
+            "output_cost_per_million_tokens": 0.40,
+            "avg_output_tokens_per_run": 700,
+            "parameters": {}
+        },
+        "meta-llama/llama-3-8b-instruct": {
+            "name": "Llama 3 8B Instruct",
+            "model_id": "meta-llama/llama-3-8b-instruct",
+            "input_cost_per_million_tokens": 0.05,
+            "output_cost_per_million_tokens": 0.25,
+            "avg_output_tokens_per_run": 700,
+            "parameters": {}
+        },
+    },
+    "speech": {
+        "minimax/speech-02-turbo": {
+            "name": "MiniMax Speech-02-Turbo",
+            "model_id": "minimax/speech-02-turbo",
+            # Estimated cost per second based on similar models: $0.00038 for ~2s generation
+            "cost_per_second": 0.00019,
+            "parameters": {
+                "speed": {"type": "float", "default": 1.1, "min": 0.5, "max": 2.0, "step": 0.1},
+                "pitch": {"type": "float", "default": 0, "min": -10, "max": 10, "step": 0.5},
+                "volume": {"type": "float", "default": 1, "min": 0, "max": 2, "step": 0.1},
+            }
+        },
+        "jaaari/kokoro-82m": {
+            "name": "Kokoro-82M",
+            "model_id": "jaaari/kokoro-82m",
+            "cost_per_run": 0.00038, # Direct cost per run found
+            "parameters": {
+                "speed": {"type": "float", "default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1},
+            }
+        }
+    },
+    "video": {
+        "luma/ray-flash-2-540p": {
+            "name": "Luma Ray Flash 2 (540p)",
+            "model_id": "luma/ray-flash-2-540p",
+            "cost_per_video_segment": 0.45, # Cost per 5s video segment based on luma/ray pricing
+            "parameters": {
+                "fps": {"type": "int", "default": 24, "min": 10, "max": 30, "step": 1},
+                "guidance": {"type": "float", "default": 3.0, "min": 0.0, "max": 10.0, "step": 0.1},
+                "num_inference_steps": {"type": "int", "default": 30, "min": 10, "max": 100, "step": 5}
+            }
+        },
+        "google/veo-3": {
+            "name": "Google Veo 3",
+            "model_id": "google/veo-3",
+            "cost_per_second": 0.75, # Direct cost per second
+            "parameters": {
+                "fps": {"type": "int", "default": 24, "min": 10, "max": 30, "step": 1},
+                "quality": {"type": "int", "default": 10, "min": 1, "max": 10, "step": 1},
+            }
+        },
+        "minimax/video-01-director": {
+            "name": "Minimax Video-01-Director",
+            "model_id": "minimax/video-01-director",
+            "cost_per_video_segment": 0.50, # Direct cost per video
+            "parameters": {
+                "fps": {"type": "int", "default": 24, "min": 10, "max": 30, "step": 1},
+                "num_inference_steps": {"type": "int", "default": 50, "min": 20, "max": 100, "step": 5},
+            }
+        }
+    },
+    "music": {
+        "google/lyria-2": {
+            "name": "Google Lyria 2",
+            "model_id": "google/lyria-2",
+            "cost_per_second": 0.01, # Placeholder, direct pricing not found, estimating low cost
+            "parameters": {}
+        },
+        "meta/musicgen": {
+            "name": "Meta MusicGen (Melody)",
+            "model_id": "meta/musicgen",
+            "cost_per_run": 0.085, # Direct cost per run
+            "parameters": {
+                "duration": {"type": "float", "default": 10.0, "min": 1.0, "max": 30.0, "step": 1.0},
+                "model_version": {"type": "str", "default": "melody", "options": ["melody", "large"]},
+            }
+        },
+    }
+}
+
+# --- Streamlit UI ---
 
 # Input fields for Replicate API Key and video topic
 replicate_api_key = st.text_input("Enter your Replicate API Key", type="password")
@@ -34,8 +135,7 @@ video_topic_raw = st.text_input("Enter a video topic (e.g., 'Why the Earth rotat
 # Sanitize video_topic immediately after input to prevent UnicodeEncodeError in API calls
 video_topic = sanitize_for_api(video_topic_raw)
 
-
-# Dictionary mapping display names to Replicate voice IDs
+# Dictionary mapping display names to Replicate voice IDs for the speech models (fixed for now)
 voice_options = {
     "Wise Woman": "Wise_Woman",
     "Friendly Person": "Friendly_Person",
@@ -59,27 +159,23 @@ voice_options = {
 # List of available emotion options for the voiceover
 emotion_options = ["auto", "happy", "sad", "angry", "surprised", "fearful", "disgusted"]
 
-# Section for Video Settings
+# --- Video Settings ---
 st.subheader("Video Settings")
-# Use columns for better layout of video settings
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    # New selectbox for video category
     video_category = st.selectbox(
         "Video Category:",
         ["Educational", "Advertisement", "Movie Trailer"],
         help="Choose the category for your video, influencing script and visual style."
     )
     
-    # Selectbox for video style
     video_style = st.selectbox(
         "Video Style:",
         ["Documentary", "Cinematic", "Educational", "Modern", "Nature", "Scientific"],
         help="Choose the visual style for your video"
     )
 
-    # Selectbox for aspect ratio
     aspect_ratio = st.selectbox(
         "Video Dimensions:",
         ["16:9", "9:16", "1:1", "4:3"],
@@ -87,14 +183,14 @@ with col1:
     )
 
 with col2:
-    # Selectbox for video quality (number of frames)
-    num_frames = st.selectbox(
-        "Video Quality:",
+    num_frames_option = st.selectbox(
+        "Video Quality (for Luma Ray Flash 2):",
         [("Standard (120 frames)", 120), ("High (200 frames)", 200)],
-        format_func=lambda x: x[0] # Display the text part of the tuple
-    )[1] # Get the frame count
+        format_func=lambda x: x[0],
+        help="Choose number of frames for video generation (primarily for Luma Ray models)"
+    )
+    num_frames = num_frames_option[1]
 
-    # Checkbox to enable looping video segments
     enable_loop = st.checkbox(
         "Loop video segments",
         value=False,
@@ -102,31 +198,26 @@ with col2:
     )
 
 with col3:
-    # Selectbox for voice narration
     selected_voice = st.selectbox(
-        "Voice:",
+        "Voice (for MiniMax Speech-02-Turbo):",
         options=list(voice_options.keys()),
         index=0,
         help="Select the voice that will narrate your video"
     )
 
-    # Selectbox for voice emotion
     selected_emotion = st.selectbox(
-        "Voice emotion:",
+        "Voice emotion (for MiniMax Speech-02-Turbo):",
         options=emotion_options,
         index=0,
         help="Select the emotional tone for the voiceover"
     )
 
-# Section for Audio Settings
+# --- Audio Settings ---
 st.subheader("Audio Settings")
-# Use columns for better layout of audio settings
 col_audio1, col_audio2 = st.columns(2)
 with col_audio1:
-    # Checkbox to include voiceover
     include_voiceover = st.checkbox("Include VoiceOver", value=True, help="Check to include a generated voiceover narration in your video.")
 with col_audio2:
-    # Selectbox for total video length
     video_length_option = st.selectbox(
         "Video Length:",
         ["10 seconds", "15 seconds", "20 seconds"],
@@ -141,29 +232,25 @@ script_prompt_template = ""
 video_visual_style_prompt = ""
 music_style_prompt = ""
 
-# Base prompt for script generation, will be modified by category
-base_script_prompt = ""
+base_script_prompt_template = ""
 if video_length_option == "10 seconds":
     num_segments = 2
     total_video_duration = 10
-    # Increased word count suggestion for each segment for more continuous narration
-    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', and '2:'. "
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', and '2:'. "
 elif video_length_option == "15 seconds":
     num_segments = 3
     total_video_duration = 15
-    # Increased word count suggestion for each segment for more continuous narration
-    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', and '3:'. "
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', and '3:'. "
 else: # Default to 20 seconds
     num_segments = 4
     total_video_duration = 20
-    # Increased word count suggestion for each segment for more continuous narration
-    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', '3:', and '4:'. "
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', '3:', and '4:'. "
 
 # Adjust prompts based on video category
 if video_category == "Educational":
     script_prompt_template = (
         f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
-        f"{base_script_prompt}"
+        f"{base_script_prompt_template}"
         f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
         f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
         f"Write in an engaging, conversational tone that keeps viewers hooked. Avoid generic statements."
@@ -174,7 +261,7 @@ if video_category == "Educational":
 elif video_category == "Advertisement":
     script_prompt_template = (
         f"You are an expert video scriptwriter. Write a compelling, persuasive script for a {total_video_duration}-second **advertisement** about '{{video_topic}}'. "
-        f"{base_script_prompt}"
+        f"{base_script_prompt_template}"
         f"Focus on benefits, problem-solution, and a clear call to action. Each segment should highlight a key feature, benefit, or evoke a positive emotion. "
         f"The final segment should include a strong call to action (e.g., 'Learn more at...', 'Buy now!', 'Visit our website!'). "
         f"Use a professional, enticing, and slightly urgent tone. Avoid generic statements."
@@ -185,7 +272,7 @@ elif video_category == "Advertisement":
 elif video_category == "Movie Trailer":
     script_prompt_template = (
         f"You are an expert video scriptwriter. Write a dramatic, suspenseful script for a {total_video_duration}-second **movie trailer** for a film titled '{{video_topic}}'. "
-        f"{base_script_prompt}"
+        f"{base_script_prompt_template}"
         f"Each segment should introduce elements of the plot, characters, or rising conflict, building suspense. "
         f"The final segment should be a compelling, open-ended hook that leaves the audience wanting more. "
         f"Use evocative language, questions, and a fast-paced, intense tone. Build anticipation."
@@ -193,10 +280,190 @@ elif video_category == "Movie Trailer":
     video_visual_style_prompt = f"epic, dramatic, cinematic shots for a movie trailer about '{{video_topic}}'. Emphasize tension, conflict, character expressions. Style: dark, moody, high-contrast, blockbuster film. Camera movement: intense, sweeping, purposeful. No text overlays."
     music_style_prompt = f"Dramatic, suspenseful, and epic background music for a movie trailer about {{video_topic}}. Build tension and excitement with orchestral elements."
 
+# --- Model Selection ---
+st.subheader("Model Selection")
+col_model1, col_model2, col_model3, col_model4 = st.columns(4)
 
-# Section for Camera Movement options
+with col_model1:
+    selected_text_model_name = st.selectbox(
+        "Text Model:",
+        options=[config["name"] for config in MODEL_CONFIGS["text"].values()],
+        index=0, # Default to Claude 4 Sonnet
+        key="text_model_select"
+    )
+    selected_text_model_id = next(config["model_id"] for config in MODEL_CONFIGS["text"].values() if config["name"] == selected_text_model_name)
+
+with col_model2:
+    selected_speech_model_name = st.selectbox(
+        "Speech Model:",
+        options=[config["name"] for config in MODEL_CONFIGS["speech"].values()],
+        index=0, # Default to MiniMax Speech-02-Turbo
+        key="speech_model_select"
+    )
+    selected_speech_model_id = next(config["model_id"] for config in MODEL_CONFIGS["speech"].values() if config["name"] == selected_speech_model_name)
+
+with col_model3:
+    selected_video_model_name = st.selectbox(
+        "Video Model:",
+        options=[config["name"] for config in MODEL_CONFIGS["video"].values()],
+        index=0, # Default to Luma Ray Flash 2 (540p)
+        key="video_model_select"
+    )
+    selected_video_model_id = next(config["model_id"] for config in MODEL_CONFIGS["video"].values() if config["name"] == selected_video_model_name)
+
+with col_model4:
+    selected_music_model_name = st.selectbox(
+        "Music Model:",
+        options=[config["name"] for config in MODEL_CONFIGS["music"].values()],
+        index=0, # Default to Google Lyria 2
+        key="music_model_select"
+    )
+    selected_music_model_id = next(config["model_id"] for config in MODEL_CONFIGS["music"].values() if config["name"] == selected_music_model_name)
+
+# --- Advanced Model Parameters (Dynamic) ---
+st.subheader("Advanced Model Parameters")
+st.write("Adjust parameters for the currently selected models below.")
+
+# Get the selected model configurations
+text_model_config = next(config for config in MODEL_CONFIGS["text"].values() if config["name"] == selected_text_model_name)
+speech_model_config = next(config for config in MODEL_CONFIGS["speech"].values() if config["name"] == selected_speech_model_name)
+video_model_config = next(config for config in MODEL_CONFIGS["video"].values() if config["name"] == selected_video_model_name)
+music_model_config = next(config for config in MODEL_CONFIGS["music"].values() if config["name"] == selected_music_model_name)
+
+# Create dynamic parameter inputs for each model type if they have configurable parameters
+advanced_params = {}
+
+col_adv1, col_adv2, col_adv3, col_adv4 = st.columns(4)
+
+with col_adv1:
+    st.markdown(f"**{selected_text_model_name} Parameters**")
+    if text_model_config["parameters"]:
+        for param_name, details in text_model_config["parameters"].items():
+            if details["type"] == "float":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"text_{param_name}")
+            elif details["type"] == "int":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"text_{param_name}")
+            elif details["type"] == "str" and "options" in details:
+                advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"text_{param_name}")
+            elif details["type"] == "str":
+                advanced_params[param_name] = st.text_input(param_name, value=details["default"], key=f"text_{param_name}")
+            elif details["type"] == "bool":
+                advanced_params[param_name] = st.checkbox(param_name, value=details["default"], key=f"text_{param_name}")
+    else:
+        st.write("No configurable parameters.")
+
+with col_adv2:
+    st.markdown(f"**{selected_speech_model_name} Parameters**")
+    if speech_model_config["parameters"]:
+        for param_name, details in speech_model_config["parameters"].items():
+            if details["type"] == "float":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"speech_{param_name}")
+            elif details["type"] == "int":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"speech_{param_name}")
+            elif details["type"] == "str" and "options" in details:
+                advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"speech_{param_name}")
+            elif details["type"] == "str":
+                advanced_params[param_name] = st.text_input(param_name, value=details["default"], key=f"speech_{param_name}")
+            elif details["type"] == "bool":
+                advanced_params[param_name] = st.checkbox(param_name, value=details["default"], key=f"speech_{param_name}")
+    else:
+        st.write("No configurable parameters.")
+
+with col_adv3:
+    st.markdown(f"**{selected_video_model_name} Parameters**")
+    if video_model_config["parameters"]:
+        for param_name, details in video_model_config["parameters"].items():
+            if param_name == "num_frames": # Skip num_frames as it's controlled by Video Quality
+                continue
+            if details["type"] == "float":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"video_{param_name}")
+            elif details["type"] == "int":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"video_{param_name}")
+            elif details["type"] == "str" and "options" in details:
+                advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"video_{param_name}")
+            elif details["type"] == "str":
+                advanced_params[param_name] = st.text_input(param_name, value=details["default"], key=f"video_{param_name}")
+            elif details["type"] == "bool":
+                advanced_params[param_name] = st.checkbox(param_name, value=details["default"], key=f"video_{param_name}")
+    else:
+        st.write("No configurable parameters.")
+
+with col_adv4:
+    st.markdown(f"**{selected_music_model_name} Parameters**")
+    if music_model_config["parameters"]:
+        for param_name, details in music_model_config["parameters"].items():
+            if details["type"] == "float":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"music_{param_name}")
+            elif details["type"] == "int":
+                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"music_{param_name}")
+            elif details["type"] == "str" and "options" in details:
+                advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"music_{param_name}")
+            elif details["type"] == "str":
+                advanced_params[param_name] = st.text_input(param_name, value=details["default"], key=f"music_{param_name}")
+            elif details["type"] == "bool":
+                advanced_params[param_name] = st.checkbox(param_name, value=details["default"], key=f"music_{param_name}")
+    else:
+        st.write("No configurable parameters.")
+
+
+# --- Estimated Cost Calculation ---
+def calculate_estimated_cost(total_video_duration, num_segments, selected_text_model_id, selected_speech_model_id, selected_video_model_id, selected_music_model_id, script_prompt_template, video_topic, cleaned_narration=""):
+    cost = 0.0
+
+    # Text Model Cost
+    text_model_config = next(config for config in MODEL_CONFIGS["text"].values() if config["model_id"] == selected_text_model_id)
+    # Estimate input tokens: prompt length / 4 (chars per token)
+    estimated_input_tokens = len(script_prompt_template.format(video_topic=video_topic)) / 4
+    # Estimate output tokens: based on average words per segment and total segments.
+    # 20 words/segment * 1.3 tokens/word = 26 tokens/segment
+    estimated_output_tokens = (total_video_duration / 5) * 26 # 5 seconds per segment, 26 tokens per segment
+    
+    cost += (estimated_input_tokens / 1_000_000) * text_model_config["input_cost_per_million_tokens"]
+    cost += (estimated_output_tokens / 1_000_000) * text_model_config["output_cost_per_million_tokens"]
+
+    # Speech Model Cost
+    if include_voiceover and cleaned_narration: # Only calculate if voiceover is included and not empty
+        speech_model_config = next(config for config in MODEL_CONFIGS["speech"].values() if config["model_id"] == selected_speech_model_id)
+        if "cost_per_second" in speech_model_config:
+            # We estimate speech duration as total_video_duration, including the 2s lead-in
+            cost += (total_video_duration) * speech_model_config["cost_per_second"]
+        elif "cost_per_run" in speech_model_config:
+            cost += speech_model_config["cost_per_run"]
+    
+    # Video Model Cost
+    video_model_config = next(config for config in MODEL_CONFIGS["video"].values() if config["model_id"] == selected_video_model_id)
+    if "cost_per_video_segment" in video_model_config:
+        cost += num_segments * video_model_config["cost_per_video_segment"]
+    elif "cost_per_second" in video_model_config:
+        cost += total_video_duration * video_model_config["cost_per_second"]
+
+    # Music Model Cost
+    music_model_config = next(config for config in MODEL_CONFIGS["music"].values() if config["model_id"] == selected_music_model_id)
+    if "cost_per_second" in music_model_config:
+        cost += total_video_duration * music_model_config["cost_per_second"]
+    elif "cost_per_run" in music_model_config:
+        cost += music_model_config["cost_per_run"] # Assume one music generation per video
+
+    return cost
+
+# Calculate estimated cost dynamically
+# Need a placeholder for cleaned_narration to pass to cost calculation
+temp_cleaned_narration = "This is a placeholder for narration to estimate costs."
+estimated_cost = calculate_estimated_cost(
+    total_video_duration,
+    num_segments,
+    selected_text_model_id,
+    selected_speech_model_id,
+    selected_video_model_id,
+    selected_music_model_id,
+    script_prompt_template,
+    video_topic,
+    temp_cleaned_narration if include_voiceover else ""
+)
+st.metric("Estimated Cost", f"${estimated_cost:.4f}") # Display estimated cost
+
+# --- Camera Movement options ---
 st.subheader("Camera Movement (Optional)")
-# List of available camera movement concepts
 camera_concepts = [
     "static", "zoom_in", "zoom_out", "pan_left", "pan_right",
     "tilt_up", "tilt_down", "orbit_left", "orbit_right",
@@ -204,7 +471,6 @@ camera_concepts = [
     "aerial", "aerial_drone", "handheld", "dolly_zoom"
 ]
 
-# Multiselect for choosing camera movements
 selected_concepts = st.multiselect(
     "Choose camera movements (will be applied randomly to segments):",
     options=camera_concepts,
@@ -212,161 +478,170 @@ selected_concepts = st.multiselect(
     help="Select camera movements to make your video more dynamic"
 )
 
-# Main generation button, dynamically displays the selected video length
+
+# --- Main Generation Logic ---
 if replicate_api_key and video_topic and st.button(f"Generate {video_length_option} Video"):
-    # Initialize Replicate client with the provided API key
     replicate_client = replicate.Client(api_token=replicate_api_key)
 
-    # Helper function to run Replicate models
-    def run_replicate(model_path, input_data):
-        return replicate_client.run(model_path, input=input_data)
+    def run_replicate(model_id, input_data):
+        return replicate_client.run(model_id, input=input_data)
 
-    # Helper function to download content from a URL to a temporary file
     def download_to_file(url: str, suffix: str):
         resp = requests.get(url, stream=True)
-        resp.raise_for_status() # Raise an exception for bad status codes
+        resp.raise_for_status()
         tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
         with open(tmp.name, "wb") as f:
-            for chunk in resp.iter_content(1024 * 32): # Download in chunks
+            for chunk in resp.iter_content(1024 * 32):
                 f.write(chunk)
         return tmp.name
 
     # Step 1: Write the cohesive script for the full video
-    st.info(f"Step 1: Writing cohesive script for {total_video_duration}-second {video_category} video")
+    st.info(f"Step 1: Writing cohesive script for {total_video_duration}-second {video_category} video using {selected_text_model_name}")
     
-    # Sanitize the prompt before sending to Replicate
     sanitized_script_prompt = sanitize_for_api(script_prompt_template.format(video_topic=video_topic))
     full_script = run_replicate(
-        "anthropic/claude-4-sonnet",
+        selected_text_model_id,
         {
             "prompt": sanitized_script_prompt
         },
     )
 
-    # Process the script output from Replicate
     script_text = "".join(full_script) if isinstance(full_script, list) else full_script
-    # Extract script segments using regex (e.g., "1: First segment", "2: Second segment")
     script_segments = re.findall(r"\d+:\s*(.+)", script_text)
 
-    # Validate that the correct number of segments were extracted
     if len(script_segments) < num_segments:
         st.error(f"Failed to extract {num_segments} clear script segments. Try adjusting your topic or refining the prompt.")
         st.stop()
-    # Ensure we only take the exact number of required segments
     script_segments = script_segments[:num_segments]
 
     st.success("Script written successfully")
-    # Save the script to a temporary file and provide a download button
     script_file_path = tempfile.NamedTemporaryFile(delete=False, suffix=".txt").name
     with open(script_file_path, "w") as f:
         f.write("\n\n".join(script_segments))
     st.download_button("Download Script", script_file_path, "script.txt")
 
-    # NEW Step 2: Generate voiceover narration directly after script
+    # Step 2: Generate voiceover narration directly after script
     voice_path = None
     if include_voiceover:
-        st.info(f"Step 2: Generating voiceover narration with {selected_voice} voice")
+        st.info(f"Step 2: Generating voiceover narration with {selected_voice} voice using {selected_speech_model_name}")
         full_narration = " ".join(script_segments)
-        # Remove punctuation and special characters from the narration for cleaner VoiceOver
-        # Keep common punctuation marks like periods, commas, question marks, exclamation marks
         cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_narration)
         
-        # Add a check for empty narration after cleaning
         if not cleaned_narration.strip():
             st.warning("Voiceover script became empty after cleaning. Skipping voiceover generation.")
             voice_path = None
         else:
             try:
-                # Sanitize the narration text before sending to Replicate
                 sanitized_narration_text = sanitize_for_api(cleaned_narration)
-                # Run the speech generation model - NOW USING 'minimax/speech-02-turbo'
+                speech_model_params = {}
+                for param_name, details in speech_model_config["parameters"].items():
+                    # Only include parameters if they are explicitly in advanced_params (i.e., user adjusted)
+                    # or if they are essential model parameters like voice_id, emotion
+                    if param_name in advanced_params:
+                        speech_model_params[param_name] = advanced_params[param_name]
+                
+                # Fixed parameters for minimax/speech-02-turbo (as they are not exposed for dynamic change or are default)
+                if selected_speech_model_id == "minimax/speech-02-turbo":
+                    speech_model_params["voice_id"] = voice_options[selected_voice]
+                    speech_model_params["emotion"] = selected_emotion
+                    speech_model_params["bitrate"] = 128000
+                    speech_model_params["channel"] = "mono"
+                    speech_model_params["sample_rate"] = 32000
+                    speech_model_params["language_boost"] = "English"
+                    speech_model_params["english_normalization"] = True
+                
+                # For Kokoro-82M, it needs text and possibly speed
+                if selected_speech_model_id == "jaaari/kokoro-82m":
+                    speech_model_params["text"] = sanitized_narration_text # Text is required for this model
+                    if "speed" in advanced_params:
+                        speech_model_params["speed"] = advanced_params["speed"]
+
+
                 voiceover_uri = run_replicate(
-                    "minimax/speech-02-turbo",
+                    selected_speech_model_id,
                     {
-                        "text": sanitized_narration_text,
-                        "voice_id": voice_options[selected_voice],
-                        "emotion": selected_emotion,
-                        "speed": 1.1,
-                        "pitch": 0,
-                        "volume": 1,
-                        "bitrate": 128000,
-                        "channel": "mono",
-                        "sample_rate": 32000,
-                        "language_boost": "English",
-                        "english_normalization": True
+                        "text": sanitized_narration_text, # Text is always the main input
+                        **speech_model_params # Merge dynamically collected parameters
                     },
                 )
-                # Download the generated voiceover
                 voice_path = download_to_file(voiceover_uri, suffix=".mp3")
 
-                # Validate if the downloaded voiceover file is empty or missing
                 if not os.path.exists(voice_path) or os.path.getsize(voice_path) == 0:
                     st.error("Generated voiceover file is empty or missing. It might not have generated correctly on Replicate's side.")
                     voice_path = None
                 else:
-                    # Display the voiceover and provide a download button
                     st.audio(voice_path)
                     st.download_button("Download Voiceover", voice_path, "voiceover.mp3")
 
             except Exception as e:
                 st.error(f"Failed to generate or download voiceover: {e}")
-                voice_path = None # Set to None if generation fails, so it's not used later
-
+                voice_path = None
 
     temp_video_paths = []
     segment_clips = []
 
-    # Original Step 2 becomes NEW Step 3: Generate segment visuals for each script segment
+    # Step 3: Generate segment visuals for each script segment
     for i, segment in enumerate(script_segments):
-        st.info(f"Step 3.{i+1}: Generating visuals for segment {i+1}")
-        # Determine shot type based on segment index for cinematic variety
+        st.info(f"Step 3.{i+1}: Generating visuals for segment {i+1} using {selected_video_model_name}")
         if i == 0:
             shot_type = "establishing wide shot"
-        elif i == 1 and num_segments > 2: # Only apply if there are more than 2 segments
+        elif i == 1 and num_segments > 2:
             shot_type = "medium shot with focus on key elements"
-        elif i == 2 and num_segments > 3: # Only apply if there are more than 3 segments
+        elif i == 2 and num_segments > 3:
             shot_type = "close-up shot showing important details"
-        else: # For the last segment or if fewer segments, make it a concluding shot
+        else:
             shot_type = "dynamic concluding shot"
 
-        # Construct the video generation prompt using the category-specific visual style
         video_prompt = f"Cinematic {shot_type} for {video_visual_style_prompt.format(video_topic=video_topic)}. Visual content: {segment}."
-        
-        # Sanitize the video prompt before sending to Replicate
         sanitized_video_prompt = sanitize_for_api(video_prompt)
+        
+        video_model_params = {}
+        for param_name, details in video_model_config["parameters"].items():
+            if param_name in advanced_params:
+                video_model_params[param_name] = advanced_params[param_name]
+        
+        # Special handling for num_frames if Luma model is selected, otherwise use model default
+        if selected_video_model_id == "luma/ray-flash-2-540p":
+            video_model_params["num_frames"] = num_frames # From Streamlit UI Video Quality
+            # Default Luma Ray Flash 2 (540p) parameters
+            video_model_params.setdefault("fps", 24)
+            video_model_params.setdefault("guidance", 3.0)
+            video_model_params.setdefault("num_inference_steps", 30)
+
+        # For Google Veo 3, ensure 'prompt' is passed, and default parameters are set if not overridden
+        if selected_video_model_id == "google/veo-3":
+            video_model_params.setdefault("fps", 24)
+            video_model_params.setdefault("quality", 10)
+            
+        # For Minimax Video-01-Director
+        if selected_video_model_id == "minimax/video-01-director":
+            video_model_params.setdefault("fps", 24)
+            video_model_params.setdefault("num_inference_steps", 50)
+
         try:
-            # Run the video generation model
             video_uri = run_replicate(
-                "luma/ray-flash-2-540p",
+                selected_video_model_id,
                 {
                     "prompt": sanitized_video_prompt,
-                    "num_frames": num_frames,
-                    "fps": 24,
-                    "guidance": 3.0,  # Higher guidance for better prompt adherence
-                    "num_inference_steps": 30  # More steps for better quality
+                    **video_model_params
                 },
             )
-            # Download the generated video
             video_path = download_to_file(video_uri, suffix=".mp4")
             temp_video_paths.append(video_path)
 
-            # Create a VideoFileClip from the downloaded video, ensuring 5s per segment
             clip = VideoFileClip(video_path).subclip(0, 5)
             segment_clips.append(clip)
 
-            # Display the generated video and provide a download button
             st.video(video_path)
             st.download_button(f"Download Segment {i+1}", video_path, f"segment_{i+1}.mp4")
         except Exception as e:
             st.error(f"Failed to generate or download segment {i+1} video: {e}")
-            st.stop() # Stop execution if a segment video fails to generate
+            st.stop()
 
-    # Original Step 3 becomes NEW Step 4: Concatenate video segments first
+    # Step 4: Concatenate video segments first
     st.info("Step 4: Combining video segments")
     try:
-        # Concatenate all generated video clips
         final_video = concatenate_videoclips(segment_clips, method="compose")
-        # Ensure the final video duration matches the selected total length
         final_video = final_video.set_duration(total_video_duration)
         final_duration = final_video.duration
         st.success(f"Video segments combined - Total duration: {final_duration} seconds")
@@ -374,114 +649,150 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         st.error(f"Failed to combine video segments: {e}")
         st.stop()
 
-    # Original Step 4 becomes NEW Step 5: Generate background music
-    st.info("Step 5: Creating background music")
+    # Step 5: Generate background music
+    st.info(f"Step 5: Creating background music using {selected_music_model_name}")
     music_path = None
     try:
-        # Sanitize the music prompt before sending to Replicate
         sanitized_music_prompt = sanitize_for_api(music_style_prompt.format(video_topic=video_topic))
-        # Run the music generation model
+        
+        music_model_params = {}
+        for param_name, details in music_model_config["parameters"].items():
+            if param_name in advanced_params:
+                music_model_params[param_name] = advanced_params[param_name]
+
+        # Ensure 'prompt' is always passed, other model-specific defaults
+        if selected_music_model_id == "google/lyria-2":
+            music_model_params.setdefault("prompt", sanitized_music_prompt)
+        elif selected_music_model_id == "meta/musicgen":
+            music_model_params.setdefault("prompt", sanitized_music_prompt)
+            music_model_params.setdefault("duration", 10.0) # Default duration for musicgen
+            music_model_params.setdefault("model_version", "melody")
+            # If user has set duration, override it.
+            if "duration" in advanced_params:
+                music_model_params["duration"] = advanced_params["duration"]
+            if "model_version" in advanced_params:
+                music_model_params["model_version"] = advanced_params["model_version"]
+
         music_uri = run_replicate(
-            "google/lyria-2",
-            {"prompt": sanitized_music_prompt},
+            selected_music_model_id,
+            {
+                "prompt": sanitized_music_prompt, # Prompt is always needed
+                **music_model_params
+            },
         )
-        # Download the generated music
         music_path = download_to_file(music_uri, suffix=".mp3")
-        # Display the music and provide a download button
         st.audio(music_path)
         st.download_button("Download Background Music", music_path, "background_music.mp3")
     except Exception as e:
         st.error(f"Failed to generate or download music: {e}")
-        music_path = None # Set to None if generation fails
+        music_path = None
 
-    # Original Step 6 becomes NEW Step 6: Merge all audio with video
+    # Step 6: Merge all audio with video
     st.info("Step 6: Merging final audio and video")
     try:
         audio_clips = []
         
-        # Handle voiceover audio - fit exactly to video duration
         if voice_path:
             try:
                 voice_clip = AudioFileClip(voice_path)
-                st.write(f"DEBUG: Original voiceover clip duration: {voice_clip.duration} seconds")
-                voice_volume = 1.2 # Slightly increased voice volume
-                voice_clip = voice_clip.volumex(voice_volume)
-
-                # Add a 2-second initial silence for lead-in
-                initial_silence_duration = 2.0
-                sr = int(voice_clip.fps) if voice_clip.fps else 44100 # Default to 44100 if fps is 0
-                nchannels = voice_clip.nchannels if voice_clip.nchannels else 1 # Default to 1 if nchannels is 0
-
-                if initial_silence_duration > 0 and sr > 0:
-                    initial_silence = np.zeros((int(initial_silence_duration * sr), nchannels), dtype=np.float32)
-                    initial_silence_clip = AudioArrayClip(initial_silence, fps=sr)
-                    voice_clip = concatenate_audioclips([initial_silence_clip, voice_clip])
-                    st.write(f"DEBUG: Voiceover clip duration after adding {initial_silence_duration}s initial silence: {voice_clip.duration} seconds.")
-                else:
-                    st.warning(f"DEBUG: Skipping initial voiceover silence. Silence duration: {initial_silence_duration}, Sample Rate: {sr}")
+                st.write(f"DEBUG: Original voiceover clip loaded. Duration: {voice_clip.duration}s, FPS: {voice_clip.fps}, Channels: {voice_clip.nchannels}")
                 
-                # Now fit the combined voiceover (initial silence + speech) to the exact video duration
-                if voice_clip.duration > final_duration:
-                    # Trim if too long (from the end to preserve beginning and initial silence)
-                    voice_clip = voice_clip.subclip(0, final_duration)
-                    st.write(f"DEBUG: Voiceover trimmed to final duration. New total duration: {voice_clip.duration} seconds.")
-                elif voice_clip.duration < final_duration:
-                    # Pad with silence at the end if too short
-                    silence_needed = final_duration - voice_clip.duration
-                    if silence_needed > 0 and sr > 0:
-                        silence = np.zeros((int(silence_needed * sr), nchannels), dtype=np.float32)
-                        silence_clip = AudioArrayClip(silence, fps=sr)
-                        voice_clip = concatenate_audioclips([voice_clip, silence_clip])
-                        st.write(f"DEBUG: Voiceover padded with {silence_needed} seconds of silence to match final duration. New total duration: {voice_clip.duration} seconds.")
+                if voice_clip.duration == 0:
+                    st.error("Generated voiceover audio clip has zero duration. It might be corrupted or empty.")
+                    voice_path = None
+                else:
+                    voice_volume = 1.2
+                    voice_clip = voice_clip.volumex(voice_volume)
+
+                    initial_silence_duration = 2.0
+                    sr = int(voice_clip.fps) if voice_clip.fps else 44100
+                    nchannels = voice_clip.nchannels if voice_clip.nchannels else 1
+
+                    if initial_silence_duration > 0 and sr > 0:
+                        initial_silence = np.zeros((int(initial_silence_duration * sr), nchannels), dtype=np.float32)
+                        initial_silence_clip = AudioArrayClip(initial_silence, fps=sr)
+                        voice_clip = concatenate_audioclips([initial_silence_clip, voice_clip])
+                        st.write(f"DEBUG: Voiceover clip duration after adding {initial_silence_duration}s initial silence: {voice_clip.duration} seconds.")
                     else:
-                        st.warning(f"DEBUG: Skipping voiceover end-padding. Silence needed: {silence_needed}, Sample Rate: {sr}")
-                        
-                audio_clips.append(voice_clip)
+                        st.warning(f"DEBUG: Skipping initial voiceover silence. Silence duration: {initial_silence_duration}, Sample Rate: {sr}")
+                    
+                    if voice_clip.duration > final_duration:
+                        voice_clip = voice_clip.subclip(0, final_duration)
+                        st.write(f"DEBUG: Voiceover trimmed to final duration. New total duration: {voice_clip.duration} seconds.")
+                    elif voice_clip.duration < final_duration:
+                        silence_needed = final_duration - voice_clip.duration
+                        if silence_needed > 0 and sr > 0:
+                            silence = np.zeros((int(silence_needed * sr), nchannels), dtype=np.float32)
+                            silence_clip = AudioArrayClip(silence, fps=sr)
+                            voice_clip = concatenate_audioclips([voice_clip, silence_clip])
+                            st.write(f"DEBUG: Voiceover padded with {silence_needed} seconds of silence to match final duration. New total duration: {voice_clip.duration} seconds.")
+                        else:
+                            st.warning(f"DEBUG: Skipping voiceover end-padding. Silence needed: {silence_needed}, Sample Rate: {sr}")
+                            
+                    audio_clips.append(voice_clip)
+                    st.write("DEBUG: Playing processed voiceover clip (before final merge):")
+                    temp_voice_clip_export_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
+                    try:
+                        voice_clip.write_audiofile(temp_voice_clip_export_path, fps=sr)
+                        st.audio(temp_voice_clip_export_path)
+                    except Exception as export_e:
+                        st.error(f"DEBUG: Could not play processed voiceover for debug: {export_e}")
+                    finally:
+                        if os.path.exists(temp_voice_clip_export_path):
+                            os.remove(temp_voice_clip_export_path)
+
             except Exception as e:
                 st.error(f"Error loading or processing voiceover audio clip: {e}")
-                voice_path = None # Ensure it's not used further if there's an issue
+                voice_path = None
 
-        # Handle background music - fit exactly to video duration
         if music_path:
             try:
                 music_clip = AudioFileClip(music_path)
-                st.write(f"DEBUG: Music clip duration after loading: {music_clip.duration} seconds (Target: {final_duration})")
-                music_volume = 0.3  # Slightly increased music volume
-                # Apply fade effects
-                music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
+                st.write(f"DEBUG: Music clip loaded. Duration: {music_clip.duration}s, FPS: {music_clip.fps}, Channels: {music_clip.nchannels}")
                 
-                # Fit music to exact video duration
-                if music_clip.duration < final_duration:
-                    # Loop music if it's shorter than video
-                    loops_needed = int(final_duration / music_clip.duration) + 1
-                    music_clips_looped = [music_clip] * loops_needed
-                    music_clip = concatenate_audioclips(music_clips_looped)
-                    # Trim to exact duration after looping
-                    music_clip = music_clip.subclip(0, final_duration)
-                    st.write(f"DEBUG: Music looped and trimmed. New duration: {music_clip.duration} seconds.")
-                elif music_clip.duration > final_duration:
-                    # Trim from beginning to preserve the natural ending
-                    music_clip = music_clip.subclip(0, final_duration)
-                    st.write(f"DEBUG: Music trimmed. New duration: {music_clip.duration} seconds.")
+                if music_clip.duration == 0:
+                    st.error("Generated background music audio clip has zero duration. It might be corrupted or empty.")
+                    music_path = None
+                else:
+                    music_volume = 0.3
+                    music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
                     
-                audio_clips.append(music_clip)
+                    if music_clip.duration < final_duration:
+                        loops_needed = int(final_duration / music_clip.duration) + 1
+                        music_clips_looped = [music_clip] * loops_needed
+                        music_clip = concatenate_audioclips(music_clips_looped)
+                        music_clip = music_clip.subclip(0, final_duration)
+                        st.write(f"DEBUG: Music looped and trimmed. New duration: {music_clip.duration} seconds.")
+                    elif music_clip.duration > final_duration:
+                        music_clip = music_clip.subclip(0, final_duration)
+                        st.write(f"DEBUG: Music trimmed. New duration: {music_clip.duration} seconds.")
+                        
+                    audio_clips.append(music_clip)
+                    st.write("DEBUG: Playing processed music clip (before final merge):")
+                    temp_music_clip_export_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp3").name
+                    try:
+                        music_clip.write_audiofile(temp_music_clip_export_path, fps=music_clip.fps)
+                        st.audio(temp_music_clip_export_path)
+                    except Exception as export_e:
+                        st.error(f"DEBUG: Could not play processed music for debug: {export_e}")
+                    finally:
+                        if os.path.exists(temp_music_clip_export_path):
+                            os.remove(temp_music_clip_export_path)
+
             except Exception as e:
                 st.error(f"Error loading or processing background music clip: {e}")
-                music_path = None # Ensure it's not used further if there's an issue
+                music_path = None
 
-        # Composite all audio clips if any exist, otherwise set no audio
-        if audio_clips:
-            final_audio = CompositeAudioClip(audio_clips)
+        valid_audio_clips = [clip for clip in audio_clips if clip is not None and clip.duration is not None and clip.duration > 0]
+        if valid_audio_clips:
+            final_audio = CompositeAudioClip(valid_audio_clips)
             st.write(f"DEBUG: Final composite audio clip duration: {final_audio.duration} seconds.")
             final_video = final_video.set_audio(final_audio)
         else:
-            final_video = final_video.set_audio(None) # No audio if nothing was generated
-            st.warning("DEBUG: No audio clips generated for final video.")
+            final_video = final_video.set_audio(None)
+            st.warning("DEBUG: No valid audio clips found after processing. Final video will have no audio.")
 
-
-        # Define output path for the final video
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
-        # Write the final video file
         final_video.write_videofile(
             output_path,
             codec="libx264",
@@ -492,7 +803,6 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         )
 
         st.success("🎬 Final video with narration and music is ready")
-        # Display the final video and provide a download button
         st.video(output_path)
         st.download_button("Download Final Video", output_path, "final_video.mp4")
 
@@ -501,29 +811,23 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         asset_paths = []
         asset_names = []
 
-        # Add script
         if os.path.exists(script_file_path):
             asset_paths.append(script_file_path)
             asset_names.append("script.txt")
-        # Add video segments
         for idx, seg_path in enumerate(temp_video_paths):
             if os.path.exists(seg_path):
                 asset_paths.append(seg_path)
                 asset_names.append(f"segment_{idx+1}.mp4")
-        # Add voiceover
         if voice_path and os.path.exists(voice_path):
             asset_paths.append(voice_path)
             asset_names.append("voiceover.mp3")
-        # Add music
         if music_path and os.path.exists(music_path):
             asset_paths.append(music_path)
             asset_names.append("background_music.mp3")
-        # Add final video
         if os.path.exists(output_path):
             asset_paths.append(output_path)
             asset_names.append("final_video.mp4")
 
-        # Create zip file
         zip_path = tempfile.NamedTemporaryFile(delete=False, suffix=".zip").name
         with zipfile.ZipFile(zip_path, "w") as zipf:
             for file_path, arcname in zip(asset_paths, asset_names):
