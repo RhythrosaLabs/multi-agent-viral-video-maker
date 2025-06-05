@@ -19,9 +19,21 @@ st.set_page_config(layout="wide", page_title="AI Multi-Agent Video Creator")
 # Main title of the application
 st.title("AI Multi-Agent Video Creator")
 
+# Helper function to sanitize string for API calls
+def sanitize_for_api(text_string):
+    """Encodes a string to ASCII, ignoring errors, then decodes back to string.
+    This removes any non-ASCII characters that might cause UnicodeEncodeError."""
+    if isinstance(text_string, str):
+        return text_string.encode('ascii', 'ignore').decode('ascii')
+    return str(text_string).encode('ascii', 'ignore').decode('ascii')
+
+
 # Input fields for Replicate API Key and video topic
 replicate_api_key = st.text_input("Enter your Replicate API Key", type="password")
-video_topic = st.text_input("Enter a video topic (e.g., 'Why the Earth rotates' for Educational, 'New running shoes' for Advertisement, 'A dystopian future' for Movie Trailer)")
+video_topic_raw = st.text_input("Enter a video topic (e.g., 'Why the Earth rotates' for Educational, 'New running shoes' for Advertisement, 'A dystopian future' for Movie Trailer)")
+# Sanitize video_topic immediately after input to prevent UnicodeEncodeError in API calls
+video_topic = sanitize_for_api(video_topic_raw)
+
 
 # Dictionary mapping display names to Replicate voice IDs
 voice_options = {
@@ -196,15 +208,6 @@ selected_concepts = st.multiselect(
     default=["static", "zoom_in", "pan_right"],
     help="Select camera movements to make your video more dynamic"
 )
-
-# Helper function to sanitize string for API calls
-def sanitize_for_api(text_string):
-    """Encodes a string to ASCII, ignoring errors, then decodes back to string.
-    This removes any non-ASCII characters that might cause UnicodeEncodeError."""
-    if isinstance(text_string, str):
-        return text_string.encode('ascii', 'ignore').decode('ascii')
-    return str(text_string).encode('ascii', 'ignore').decode('ascii')
-
 
 # Main generation button, dynamically displays the selected video length
 if replicate_api_key and video_topic and st.button(f"Generate {video_length_option} Video"):
