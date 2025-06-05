@@ -65,8 +65,8 @@ MODEL_CONFIGS = {
             "cost_per_second": 0.00019,
             "parameters": {
                 "speed": {"type": "float", "default": 1.1, "min": 0.5, "max": 2.0, "step": 0.1},
-                "pitch": {"type": "float", "default": 0, "min": -10, "max": 10, "step": 0.5},
-                "volume": {"type": "float", "default": 1, "min": 0, "max": 2, "step": 0.1},
+                "pitch": {"type": "float", "default": 0.0, "min": -10.0, "max": 10.0, "step": 0.5}, # Changed min/max to float
+                "volume": {"type": "float", "default": 1.0, "min": 0.0, "max": 2.0, "step": 0.1},   # Changed min/max to float
             }
         },
         "jaaari/kokoro-82m": {
@@ -340,9 +340,19 @@ with col_adv1:
     if text_model_config["parameters"]:
         for param_name, details in text_model_config["parameters"].items():
             if details["type"] == "float":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"text_{param_name}")
+                # Ensure all values passed to float slider are floats
+                min_val = float(details["min"])
+                max_val = float(details["max"])
+                default_val = float(details["default"])
+                step_val = float(details.get("step", 0.1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"text_{param_name}")
             elif details["type"] == "int":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"text_{param_name}")
+                # Ensure all values passed to int slider are integers
+                min_val = int(details["min"])
+                max_val = int(details["max"])
+                default_val = int(details["default"])
+                step_val = int(details.get("step", 1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"text_{param_name}")
             elif details["type"] == "str" and "options" in details:
                 advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"text_{param_name}")
             elif details["type"] == "str":
@@ -357,9 +367,19 @@ with col_adv2:
     if speech_model_config["parameters"]:
         for param_name, details in speech_model_config["parameters"].items():
             if details["type"] == "float":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"speech_{param_name}")
+                # Ensure all values passed to float slider are floats
+                min_val = float(details["min"])
+                max_val = float(details["max"])
+                default_val = float(details["default"])
+                step_val = float(details.get("step", 0.1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"speech_{param_name}")
             elif details["type"] == "int":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"speech_{param_name}")
+                # Ensure all values passed to int slider are integers
+                min_val = int(details["min"])
+                max_val = int(details["max"])
+                default_val = int(details["default"])
+                step_val = int(details.get("step", 1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"speech_{param_name}")
             elif details["type"] == "str" and "options" in details:
                 advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"speech_{param_name}")
             elif details["type"] == "str":
@@ -376,9 +396,19 @@ with col_adv3:
             if param_name == "num_frames": # Skip num_frames as it's controlled by Video Quality
                 continue
             if details["type"] == "float":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"video_{param_name}")
+                # Ensure all values passed to float slider are floats
+                min_val = float(details["min"])
+                max_val = float(details["max"])
+                default_val = float(details["default"])
+                step_val = float(details.get("step", 0.1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"video_{param_name}")
             elif details["type"] == "int":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"video_{param_name}")
+                # Ensure all values passed to int slider are integers
+                min_val = int(details["min"])
+                max_val = int(details["max"])
+                default_val = int(details["default"])
+                step_val = int(details.get("step", 1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"video_{param_name}")
             elif details["type"] == "str" and "options" in details:
                 advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"video_{param_name}")
             elif details["type"] == "str":
@@ -393,9 +423,19 @@ with col_adv4:
     if music_model_config["parameters"]:
         for param_name, details in music_model_config["parameters"].items():
             if details["type"] == "float":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 0.1), key=f"music_{param_name}")
+                # Ensure all values passed to float slider are floats
+                min_val = float(details["min"])
+                max_val = float(details["max"])
+                default_val = float(details["default"])
+                step_val = float(details.get("step", 0.1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"music_{param_name}")
             elif details["type"] == "int":
-                advanced_params[param_name] = st.slider(param_name, min_value=details["min"], max_value=details["max"], value=details["default"], step=details.get("step", 1), key=f"music_{param_name}")
+                # Ensure all values passed to int slider are integers
+                min_val = int(details["min"])
+                max_val = int(details["max"])
+                default_val = int(details["default"])
+                step_val = int(details.get("step", 1))
+                advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"music_{param_name}")
             elif details["type"] == "str" and "options" in details:
                 advanced_params[param_name] = st.selectbox(param_name, options=details["options"], index=details["options"].index(details["default"]) if details["default"] in details["options"] else 0, key=f"music_{param_name}")
             elif details["type"] == "str":
