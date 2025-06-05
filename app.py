@@ -254,7 +254,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     script_file_path = tempfile.NamedTemporaryFile(delete=False, suffix=".txt").name
     with open(script_file_path, "w") as f:
         f.write("\n\n".join(script_segments))
-    st.download_button("📜 Download Script", script_file_path, "script.txt")
+    st.download_button("Download Script", script_file_path, "script.txt")
 
     # NEW Step 2: Generate voiceover narration directly after script
     voice_path = None
@@ -300,7 +300,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                 else:
                     # Display the voiceover and provide a download button
                     st.audio(voice_path)
-                    st.download_button("🎙 Download Voiceover", voice_path, "voiceover.mp3")
+                    st.download_button("Download Voiceover", voice_path, "voiceover.mp3")
 
             except Exception as e:
                 st.error(f"Failed to generate or download voiceover: {e}")
@@ -350,7 +350,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
 
             # Display the generated video and provide a download button
             st.video(video_path)
-            st.download_button(f"🎥 Download Segment {i+1}", video_path, f"segment_{i+1}.mp4")
+            st.download_button(f"Download Segment {i+1}", video_path, f"segment_{i+1}.mp4")
         except Exception as e:
             st.error(f"Failed to generate or download segment {i+1} video: {e}")
             st.stop() # Stop execution if a segment video fails to generate
@@ -383,7 +383,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         music_path = download_to_file(music_uri, suffix=".mp3")
         # Display the music and provide a download button
         st.audio(music_path)
-        st.download_button("🎵 Download Background Music", music_path, "background_music.mp3")
+        st.download_button("Download Background Music", music_path, "background_music.mp3")
     except Exception as e:
         st.error(f"Failed to generate or download music: {e}")
         music_path = None # Set to None if generation fails
@@ -480,7 +480,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         st.success("🎬 Final video with narration and music is ready")
         # Display the final video and provide a download button
         st.video(output_path)
-        st.download_button("📽 Download Final Video", output_path, "final_video.mp4")
+        st.download_button("Download Final Video", output_path, "final_video.mp4")
 
         # --- Create a zip file with all assets and provide a download button ---
         import zipfile
@@ -514,7 +514,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         with zipfile.ZipFile(zip_path, "w") as zipf:
             for file_path, arcname in zip(asset_paths, asset_names):
                 zipf.write(file_path, arcname=arcname)
-        st.download_button("🗜 Download All Assets (ZIP)", zip_path, "video_assets.zip")
+        st.download_button("Download All Assets (ZIP)", zip_path, "video_assets.zip")
 
     except Exception as e:
         st.warning("Final video merge failed, but you can still download individual assets.")
