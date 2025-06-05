@@ -400,30 +400,38 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         if voice_path:
             try:
                 voice_clip = AudioFileClip(voice_path)
-                st.write(f"DEBUG: Voiceover clip duration after loading: {voice_clip.duration} seconds (Target: {final_duration})")
+                st.write(f"DEBUG: Original voiceover clip duration: {voice_clip.duration} seconds")
                 voice_volume = 1.0
                 voice_clip = voice_clip.volumex(voice_volume)
+
+                # Add a 2-second initial silence for lead-in
+                initial_silence_duration = 2.0
+                sr = int(voice_clip.fps) if voice_clip.fps else 44100 # Default to 44100 if fps is 0
+                nchannels = voice_clip.nchannels if voice_clip.nchannels else 1 # Default to 1 if nchannels is 0
+
+                if initial_silence_duration > 0 and sr > 0:
+                    initial_silence = np.zeros((int(initial_silence_duration * sr), nchannels), dtype=np.float32)
+                    initial_silence_clip = AudioArrayClip(initial_silence, fps=sr)
+                    voice_clip = concatenate_audioclips([initial_silence_clip, voice_clip])
+                    st.write(f"DEBUG: Voiceover clip duration after adding {initial_silence_duration}s initial silence: {voice_clip.duration} seconds.")
+                else:
+                    st.warning(f"DEBUG: Skipping initial voiceover silence. Silence duration: {initial_silence_duration}, Sample Rate: {sr}")
                 
-                # Fit voiceover to exact video duration
+                # Now fit the combined voiceover (initial silence + speech) to the exact video duration
                 if voice_clip.duration > final_duration:
-                    # Trim if too long (from the end to preserve beginning)
+                    # Trim if too long (from the end to preserve beginning and initial silence)
                     voice_clip = voice_clip.subclip(0, final_duration)
-                    st.write(f"DEBUG: Voiceover trimmed. New duration: {voice_clip.duration} seconds.")
+                    st.write(f"DEBUG: Voiceover trimmed to final duration. New total duration: {voice_clip.duration} seconds.")
                 elif voice_clip.duration < final_duration:
                     # Pad with silence at the end if too short
-                    from moviepy.audio.AudioClip import AudioArrayClip # Moved here for clarity, though already imported globally
-                    sr = int(voice_clip.fps)
-                    silence_duration = final_duration - voice_clip.duration
-                    # Create silence: (samples, 1) for mono
-                    # Ensure the silence array is created with the correct shape for moviepy to recognize it as audio
-                    # If audio_clip.duration is 0, this can cause issues. Add a check.
-                    if silence_duration > 0 and sr > 0:
-                        silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
+                    silence_needed = final_duration - voice_clip.duration
+                    if silence_needed > 0 and sr > 0:
+                        silence = np.zeros((int(silence_needed * sr), nchannels), dtype=np.float32)
                         silence_clip = AudioArrayClip(silence, fps=sr)
                         voice_clip = concatenate_audioclips([voice_clip, silence_clip])
-                        st.write(f"DEBUG: Voiceover padded with {silence_duration} seconds of silence. New duration: {voice_clip.duration} seconds.")
+                        st.write(f"DEBUG: Voiceover padded with {silence_needed} seconds of silence to match final duration. New total duration: {voice_clip.duration} seconds.")
                     else:
-                        st.warning(f"DEBUG: Skipping voiceover padding. Silence duration: {silence_duration}, Sample Rate: {sr}")
+                        st.warning(f"DEBUG: Skipping voiceover end-padding. Silence needed: {silence_needed}, Sample Rate: {sr}")
                         
                 audio_clips.append(voice_clip)
             except Exception as e:
