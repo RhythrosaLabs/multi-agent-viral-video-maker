@@ -65,8 +65,8 @@ MODEL_CONFIGS = {
             "cost_per_second": 0.00019,
             "parameters": {
                 "speed": {"type": "float", "default": 1.1, "min": 0.5, "max": 2.0, "step": 0.1},
-                "pitch": {"type": "float", "default": 0.0, "min": -10.0, "max": 10.0, "step": 0.5}, # Changed min/max to float
-                "volume": {"type": "float", "default": 1.0, "min": 0.0, "max": 2.0, "step": 0.1},   # Changed min/max to float
+                "pitch": {"type": "float", "default": 0.0, "min": -10.0, "max": 10.0, "step": 0.5},
+                "volume": {"type": "float", "default": 1.0, "min": 0.0, "max": 2.0, "step": 0.1},
             }
         },
         "jaaari/kokoro-82m": {
@@ -84,6 +84,7 @@ MODEL_CONFIGS = {
             "model_id": "luma/ray-flash-2-540p",
             "cost_per_video_segment": 0.45, # Cost per 5s video segment based on luma/ray pricing
             "parameters": {
+                "num_frames": {"type": "int", "default": 120, "min": 120, "max": 200, "step": 10}, # Moved here
                 "fps": {"type": "int", "default": 24, "min": 10, "max": 30, "step": 1},
                 "guidance": {"type": "float", "default": 3.0, "min": 0.0, "max": 10.0, "step": 0.1},
                 "num_inference_steps": {"type": "int", "default": 30, "min": 10, "max": 100, "step": 5}
@@ -159,127 +160,6 @@ voice_options = {
 # List of available emotion options for the voiceover
 emotion_options = ["auto", "happy", "sad", "angry", "surprised", "fearful", "disgusted"]
 
-# --- Video Settings ---
-st.subheader("Video Settings")
-col1, col2, col3 = st.columns(3)
-
-with col1:
-    video_category = st.selectbox(
-        "Video Category:",
-        ["Educational", "Advertisement", "Movie Trailer"],
-        help="Choose the category for your video, influencing script and visual style."
-    )
-    
-    video_style = st.selectbox(
-        "Video Style:",
-        ["Documentary", "Cinematic", "Educational", "Modern", "Nature", "Scientific"],
-        help="Choose the visual style for your video"
-    )
-
-    aspect_ratio = st.selectbox(
-        "Video Dimensions:",
-        ["16:9", "9:16", "1:1", "4:3"],
-        help="Choose aspect ratio for your video"
-    )
-
-with col2:
-    num_frames_option = st.selectbox(
-        "Video Quality (for Luma Ray Flash 2):",
-        [("Standard (120 frames)", 120), ("High (200 frames)", 200)],
-        format_func=lambda x: x[0],
-        help="Choose number of frames for video generation (primarily for Luma Ray models)"
-    )
-    num_frames = num_frames_option[1]
-
-    enable_loop = st.checkbox(
-        "Loop video segments",
-        value=False,
-        help="Make video segments loop smoothly"
-    )
-
-with col3:
-    selected_voice = st.selectbox(
-        "Voice (for MiniMax Speech-02-Turbo):",
-        options=list(voice_options.keys()),
-        index=0,
-        help="Select the voice that will narrate your video"
-    )
-
-    selected_emotion = st.selectbox(
-        "Voice emotion (for MiniMax Speech-02-Turbo):",
-        options=emotion_options,
-        index=0,
-        help="Select the emotional tone for the voiceover"
-    )
-
-# --- Audio Settings ---
-st.subheader("Audio Settings")
-col_audio1, col_audio2 = st.columns(2)
-with col_audio1:
-    include_voiceover = st.checkbox("Include VoiceOver", value=True, help="Check to include a generated voiceover narration in your video.")
-with col_audio2:
-    video_length_option = st.selectbox(
-        "Video Length:",
-        ["10 seconds", "15 seconds", "20 seconds"],
-        index=2, # Default to 20 seconds
-        help="Select the desired total length of your video."
-    )
-
-# Determine video parameters (total duration and number of segments) based on selected length
-total_video_duration = 0
-num_segments = 0
-script_prompt_template = ""
-video_visual_style_prompt = ""
-music_style_prompt = ""
-
-base_script_prompt_template = ""
-if video_length_option == "10 seconds":
-    num_segments = 2
-    total_video_duration = 10
-    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', and '2:'. "
-elif video_length_option == "15 seconds":
-    num_segments = 3
-    total_video_duration = 15
-    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', and '3:'. "
-else: # Default to 20 seconds
-    num_segments = 4
-    total_video_duration = 20
-    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', '3:', and '4:'. "
-
-# Adjust prompts based on video category
-if video_category == "Educational":
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
-        f"{base_script_prompt_template}"
-        f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
-        f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
-        f"Write in an engaging, conversational tone that keeps viewers hooked. Avoid generic statements."
-    )
-    video_visual_style_prompt = f"educational video about '{{video_topic}}'. Style: {video_style.lower()}, clean, professional, well-lit. Camera movement: smooth, purposeful. No text overlays."
-    music_style_prompt = f"Background music for a cohesive, {total_video_duration}-second educational video about {{video_topic}}. Light, non-distracting, slightly cinematic tone."
-
-elif video_category == "Advertisement":
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a compelling, persuasive script for a {total_video_duration}-second **advertisement** about '{{video_topic}}'. "
-        f"{base_script_prompt_template}"
-        f"Focus on benefits, problem-solution, and a clear call to action. Each segment should highlight a key feature, benefit, or evoke a positive emotion. "
-        f"The final segment should include a strong call to action (e.g., 'Learn more at...', 'Buy now!', 'Visit our website!'). "
-        f"Use a professional, enticing, and slightly urgent tone. Avoid generic statements."
-    )
-    video_visual_style_prompt = f"dynamic, visually appealing shots for a product/service advertisement about '{{video_topic}}'. Highlight features. Style: modern, vibrant, clean, commercial-ready. Camera movement: engaging, product-focused. No text overlays."
-    music_style_prompt = f"Upbeat, modern, and catchy background music for a commercial advertisement about {{video_topic}}. Energetic and positive tone."
-
-elif video_category == "Movie Trailer":
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a dramatic, suspenseful script for a {total_video_duration}-second **movie trailer** for a film titled '{{video_topic}}'. "
-        f"{base_script_prompt_template}"
-        f"Each segment should introduce elements of the plot, characters, or rising conflict, building suspense. "
-        f"The final segment should be a compelling, open-ended hook that leaves the audience wanting more. "
-        f"Use evocative language, questions, and a fast-paced, intense tone. Build anticipation."
-    )
-    video_visual_style_prompt = f"epic, dramatic, cinematic shots for a movie trailer about '{{video_topic}}'. Emphasize tension, conflict, character expressions. Style: dark, moody, high-contrast, blockbuster film. Camera movement: intense, sweeping, purposeful. No text overlays."
-    music_style_prompt = f"Dramatic, suspenseful, and epic background music for a movie trailer about {{video_topic}}. Build tension and excitement with orchestral elements."
-
 # --- Model Selection ---
 st.subheader("Model Selection")
 col_model1, col_model2, col_model3, col_model4 = st.columns(4)
@@ -340,14 +220,12 @@ with col_adv1:
     if text_model_config["parameters"]:
         for param_name, details in text_model_config["parameters"].items():
             if details["type"] == "float":
-                # Ensure all values passed to float slider are floats
                 min_val = float(details["min"])
                 max_val = float(details["max"])
                 default_val = float(details["default"])
                 step_val = float(details.get("step", 0.1))
                 advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"text_{param_name}")
             elif details["type"] == "int":
-                # Ensure all values passed to int slider are integers
                 min_val = int(details["min"])
                 max_val = int(details["max"])
                 default_val = int(details["default"])
@@ -367,14 +245,12 @@ with col_adv2:
     if speech_model_config["parameters"]:
         for param_name, details in speech_model_config["parameters"].items():
             if details["type"] == "float":
-                # Ensure all values passed to float slider are floats
                 min_val = float(details["min"])
                 max_val = float(details["max"])
                 default_val = float(details["default"])
                 step_val = float(details.get("step", 0.1))
                 advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"speech_{param_name}")
             elif details["type"] == "int":
-                # Ensure all values passed to int slider are integers
                 min_val = int(details["min"])
                 max_val = int(details["max"])
                 default_val = int(details["default"])
@@ -393,17 +269,14 @@ with col_adv3:
     st.markdown(f"**{selected_video_model_name} Parameters**")
     if video_model_config["parameters"]:
         for param_name, details in video_model_config["parameters"].items():
-            if param_name == "num_frames": # Skip num_frames as it's controlled by Video Quality
-                continue
+            # num_frames is now directly handled here for Luma models
             if details["type"] == "float":
-                # Ensure all values passed to float slider are floats
                 min_val = float(details["min"])
                 max_val = float(details["max"])
                 default_val = float(details["default"])
                 step_val = float(details.get("step", 0.1))
                 advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"video_{param_name}")
             elif details["type"] == "int":
-                # Ensure all values passed to int slider are integers
                 min_val = int(details["min"])
                 max_val = int(details["max"])
                 default_val = int(details["default"])
@@ -423,14 +296,12 @@ with col_adv4:
     if music_model_config["parameters"]:
         for param_name, details in music_model_config["parameters"].items():
             if details["type"] == "float":
-                # Ensure all values passed to float slider are floats
                 min_val = float(details["min"])
                 max_val = float(details["max"])
                 default_val = float(details["default"])
                 step_val = float(details.get("step", 0.1))
                 advanced_params[param_name] = st.slider(param_name, min_value=min_val, max_value=max_val, value=default_val, step=step_val, key=f"music_{param_name}")
             elif details["type"] == "int":
-                # Ensure all values passed to int slider are integers
                 min_val = int(details["min"])
                 max_val = int(details["max"])
                 default_val = int(details["default"])
@@ -501,6 +372,137 @@ estimated_cost = calculate_estimated_cost(
     temp_cleaned_narration if include_voiceover else ""
 )
 st.metric("Estimated Cost", f"${estimated_cost:.4f}") # Display estimated cost
+
+# --- Camera Movement options ---
+st.subheader("Camera Movement (Optional)")
+camera_concepts = [
+    "static", "zoom_in", "zoom_out", "pan_left", "pan_right",
+    "tilt_up", "tilt_down", "orbit_left", "orbit_right",
+    "push_in", "pull_out", "crane_up", "crane_down",
+    "aerial", "aerial_drone", "handheld", "dolly_zoom"
+]
+
+selected_concepts = st.multiselect(
+    "Choose camera movements (will be applied randomly to segments):",
+    options=camera_concepts,
+    default=["static", "zoom_in", "pan_right"],
+    help="Select camera movements to make your video more dynamic"
+)
+
+
+# --- Video Settings --- # Moved below Model Selection and Advanced Parameters
+st.subheader("Video Settings")
+col1, col2, col3 = st.columns(3)
+
+with col1:
+    video_category = st.selectbox(
+        "Video Category:",
+        ["Educational", "Advertisement", "Movie Trailer"],
+        help="Choose the category for your video, influencing script and visual style."
+    )
+    
+    video_style = st.selectbox(
+        "Video Style:",
+        ["Documentary", "Cinematic", "Educational", "Modern", "Nature", "Scientific"],
+        help="Choose the visual style for your video"
+    )
+
+    aspect_ratio = st.selectbox(
+        "Video Dimensions:",
+        ["16:9", "9:16", "1:1", "4:3"],
+        help="Choose aspect ratio for your video"
+    )
+
+with col2:
+    # num_frames_option removed from here as it's now part of Luma model's dynamic params
+    enable_loop = st.checkbox(
+        "Loop video segments",
+        value=False,
+        help="Make video segments loop smoothly"
+    )
+
+with col3:
+    selected_voice = st.selectbox(
+        "Voice (for MiniMax Speech-02-Turbo):",
+        options=list(voice_options.keys()),
+        index=0,
+        help="Select the voice that will narrate your video"
+    )
+
+    selected_emotion = st.selectbox(
+        "Voice emotion (for MiniMax Speech-02-Turbo):",
+        options=emotion_options,
+        index=0,
+        help="Select the emotional tone for the voiceover"
+    )
+
+# --- Audio Settings ---
+st.subheader("Audio Settings")
+col_audio1, col_audio2 = st.columns(2)
+with col_audio1:
+    include_voiceover = st.checkbox("Include VoiceOver", value=True, help="Check to include a generated voiceover narration in your video.")
+with col_audio2:
+    video_length_option = st.selectbox(
+        "Video Length:",
+        ["10 seconds", "15 seconds", "20 seconds"],
+        index=2, # Default to 20 seconds
+        help="Select the desired total length of your video."
+    )
+
+# Determine video parameters (total duration and number of segments) based on selected length
+total_video_duration = 0
+num_segments = 0
+script_prompt_template = ""
+video_visual_style_prompt = ""
+music_style_prompt = ""
+
+base_script_prompt_template = ""
+if video_length_option == "10 seconds":
+    num_segments = 2
+    total_video_duration = 10
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', and '2:'. "
+elif video_length_option == "15 seconds":
+    num_segments = 3
+    total_video_duration = 15
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', and '3:'. "
+else: # Default to 20 seconds
+    num_segments = 4
+    total_video_duration = 20
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', '3:', and '4:'. "
+
+# Adjust prompts based on video category
+if video_category == "Educational":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
+        f"{base_script_prompt_template}"
+        f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
+        f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
+        f"Write in an, conversational tone that keeps viewers hooked. Avoid generic statements."
+    )
+    video_visual_style_prompt = f"educational video about '{{video_topic}}'. Style: {video_style.lower()}, clean, professional, well-lit. Camera movement: smooth, purposeful. No text overlays."
+    music_style_prompt = f"Background music for a cohesive, {total_video_duration}-second educational video about {{video_topic}}. Light, non-distracting, slightly cinematic tone."
+
+elif video_category == "Advertisement":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a compelling, persuasive script for a {total_video_duration}-second **advertisement** about '{{video_topic}}'. "
+        f"{base_script_prompt_template}"
+        f"Focus on benefits, problem-solution, and a clear call to action. Each segment should highlight a key feature, benefit, or evoke a positive emotion. "
+        f"The final segment should include a strong call to action (e.g., 'Learn more at...', 'Buy now!', 'Visit our website!'). "
+        f"Use a professional, enticing, and slightly urgent tone. Avoid generic statements."
+    )
+    video_visual_style_prompt = f"dynamic, visually appealing shots for a product/service advertisement about '{{video_topic}}'. Highlight features. Style: modern, vibrant, clean, commercial-ready. Camera movement: engaging, product-focused. No text overlays."
+    music_style_prompt = f"Upbeat, modern, and catchy background music for a commercial advertisement about {{video_topic}}. Energetic and positive tone."
+
+elif video_category == "Movie Trailer":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a dramatic, suspenseful script for a {total_video_duration}-second **movie trailer** for a film titled '{{video_topic}}'. "
+        f"{base_script_prompt_template}"
+        f"Each segment should introduce elements of the plot, characters, or rising conflict, building suspense. "
+        f"The final segment should be a compelling, open-ended hook that leaves the audience wanting more. "
+        f"Use evocative language, questions, and a fast-paced, intense tone. Build anticipation."
+    )
+    video_visual_style_prompt = f"epic, dramatic, cinematic shots for a movie trailer about '{{video_topic}}'. Emphasize tension, conflict, character expressions. Style: dark, moody, high-contrast, blockbuster film. Camera movement: intense, sweeping, purposeful. No text overlays."
+    music_style_prompt = f"Dramatic, suspenseful, and epic background music for a movie trailer about {{video_topic}}. Build tension and excitement with orchestral elements."
 
 # --- Camera Movement options ---
 st.subheader("Camera Movement (Optional)")
@@ -640,21 +642,18 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             if param_name in advanced_params:
                 video_model_params[param_name] = advanced_params[param_name]
         
-        # Special handling for num_frames if Luma model is selected, otherwise use model default
+        # Default parameters for selected video model if not overridden by user
         if selected_video_model_id == "luma/ray-flash-2-540p":
-            video_model_params["num_frames"] = num_frames # From Streamlit UI Video Quality
-            # Default Luma Ray Flash 2 (540p) parameters
+            video_model_params.setdefault("num_frames", num_frames) # This 'num_frames' is now from advanced_params
             video_model_params.setdefault("fps", 24)
             video_model_params.setdefault("guidance", 3.0)
             video_model_params.setdefault("num_inference_steps", 30)
 
-        # For Google Veo 3, ensure 'prompt' is passed, and default parameters are set if not overridden
-        if selected_video_model_id == "google/veo-3":
+        elif selected_video_model_id == "google/veo-3":
             video_model_params.setdefault("fps", 24)
             video_model_params.setdefault("quality", 10)
             
-        # For Minimax Video-01-Director
-        if selected_video_model_id == "minimax/video-01-director":
+        elif selected_video_model_id == "minimax/video-01-director":
             video_model_params.setdefault("fps", 24)
             video_model_params.setdefault("num_inference_steps", 50)
 
