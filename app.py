@@ -146,15 +146,18 @@ base_script_prompt = ""
 if video_length_option == "10 seconds":
     num_segments = 2
     total_video_duration = 10
-    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be 5-8 words. Label each section clearly as '1:', and '2:'. "
+    # Increased word count suggestion for each segment for more continuous narration
+    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', and '2:'. "
 elif video_length_option == "15 seconds":
     num_segments = 3
     total_video_duration = 15
-    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be 6-10 words. Label each section clearly as '1:', '2:', and '3:'. "
+    # Increased word count suggestion for each segment for more continuous narration
+    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', and '3:'. "
 else: # Default to 20 seconds
     num_segments = 4
     total_video_duration = 20
-    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be 6-10 words. Label each section clearly as '1:', '2:', '3:', and '4:'. "
+    # Increased word count suggestion for each segment for more continuous narration
+    base_script_prompt = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', '3:', and '4:'. "
 
 # Adjust prompts based on video category
 if video_category == "Educational":
@@ -401,7 +404,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             try:
                 voice_clip = AudioFileClip(voice_path)
                 st.write(f"DEBUG: Original voiceover clip duration: {voice_clip.duration} seconds")
-                voice_volume = 1.0
+                voice_volume = 1.2 # Slightly increased voice volume
                 voice_clip = voice_clip.volumex(voice_volume)
 
                 # Add a 2-second initial silence for lead-in
@@ -443,7 +446,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             try:
                 music_clip = AudioFileClip(music_path)
                 st.write(f"DEBUG: Music clip duration after loading: {music_clip.duration} seconds (Target: {final_duration})")
-                music_volume = 0.2  # Lower music volume for better voice clarity
+                music_volume = 0.3  # Slightly increased music volume
                 # Apply fade effects
                 music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
                 
