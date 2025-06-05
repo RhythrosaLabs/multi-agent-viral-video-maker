@@ -206,6 +206,16 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     def run_replicate(model_path, input_data):
         return replicate_client.run(model_path, input=input_data)
 
+    # Helper function to download content from a URL to a temporary file
+    def download_to_file(url: str, suffix: str):
+        resp = requests.get(url, stream=True)
+        resp.raise_for_status() # Raise an exception for bad status codes
+        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
+        with open(tmp.name, "wb") as f:
+            for chunk in resp.iter_content(1024 * 32): # Download in chunks
+                f.write(chunk)
+        return tmp.name
+
     # Step 1: Write the cohesive script for the full video
     st.info(f"Step 1: Writing cohesive script for {total_video_duration}-second {video_category} video")
     full_script = run_replicate(
@@ -234,22 +244,61 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         f.write("\n\n".join(script_segments))
     st.download_button("📜 Download Script", script_file_path, "script.txt")
 
+    # NEW Step 2: Generate voiceover narration directly after script
+    voice_path = None
+    if include_voiceover:
+        st.info(f"Step 2: Generating voiceover narration with {selected_voice} voice")
+        full_narration = " ".join(script_segments)
+        # Remove punctuation and special characters from the narration for cleaner VoiceOver
+        # Keep common punctuation marks like periods, commas, question marks, exclamation marks
+        cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_narration)
+        
+        # Add a check for empty narration after cleaning
+        if not cleaned_narration.strip():
+            st.warning("Voiceover script became empty after cleaning. Skipping voiceover generation.")
+            voice_path = None
+        else:
+            try:
+                # Run the speech generation model - NOW USING 'minimax/speech-02-turbo'
+                voiceover_uri = run_replicate(
+                    "minimax/speech-02-turbo",
+                    {
+                        "text": cleaned_narration,
+                        "voice_id": voice_options[selected_voice],
+                        "emotion": selected_emotion,
+                        "speed": 1.1,
+                        "pitch": 0,
+                        "volume": 1,
+                        "bitrate": 128000,
+                        "channel": "mono",
+                        "sample_rate": 32000,
+                        "language_boost": "English",
+                        "english_normalization": True
+                    },
+                )
+                # Download the generated voiceover
+                voice_path = download_to_file(voiceover_uri, suffix=".mp3")
+
+                # Validate if the downloaded voiceover file is empty or missing
+                if not os.path.exists(voice_path) or os.path.getsize(voice_path) == 0:
+                    st.error("Generated voiceover file is empty or missing. It might not have generated correctly on Replicate's side.")
+                    voice_path = None
+                else:
+                    # Display the voiceover and provide a download button
+                    st.audio(voice_path)
+                    st.download_button("🎙 Download Voiceover", voice_path, "voiceover.mp3")
+
+            except Exception as e:
+                st.error(f"Failed to generate or download voiceover: {e}")
+                voice_path = None # Set to None if generation fails, so it's not used later
+
+
     temp_video_paths = []
     segment_clips = []
 
-    # Helper function to download content from a URL to a temporary file
-    def download_to_file(url: str, suffix: str):
-        resp = requests.get(url, stream=True)
-        resp.raise_for_status() # Raise an exception for bad status codes
-        tmp = tempfile.NamedTemporaryFile(delete=False, suffix=suffix)
-        with open(tmp.name, "wb") as f:
-            for chunk in resp.iter_content(1024 * 32): # Download in chunks
-                f.write(chunk)
-        return tmp.name
-
-    # Step 2: Generate segment visuals for each script segment
+    # Original Step 2 becomes NEW Step 3: Generate segment visuals for each script segment
     for i, segment in enumerate(script_segments):
-        st.info(f"Step 2.{i+1}: Generating visuals for segment {i+1}")
+        st.info(f"Step 3.{i+1}: Generating visuals for segment {i+1}")
         # Determine shot type based on segment index for cinematic variety
         if i == 0:
             shot_type = "establishing wide shot"
@@ -289,8 +338,8 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
             st.error(f"Failed to generate or download segment {i+1} video: {e}")
             st.stop() # Stop execution if a segment video fails to generate
 
-    # Step 3: Concatenate video segments first
-    st.info("Step 3: Combining video segments")
+    # Original Step 3 becomes NEW Step 4: Concatenate video segments first
+    st.info("Step 4: Combining video segments")
     try:
         # Concatenate all generated video clips
         final_video = concatenate_videoclips(segment_clips, method="compose")
@@ -302,8 +351,8 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         st.error(f"Failed to combine video segments: {e}")
         st.stop()
 
-    # Step 4: Generate background music
-    st.info("Step 4: Creating background music")
+    # Original Step 4 becomes NEW Step 5: Generate background music
+    st.info("Step 5: Creating background music")
     music_path = None
     try:
         # Run the music generation model
@@ -320,55 +369,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         st.error(f"Failed to generate or download music: {e}")
         music_path = None # Set to None if generation fails
 
-    # Step 5: Generate voiceover narration LAST (after video is finalized)
-    voice_path = None
-    if include_voiceover:
-        st.info(f"Step 5: Generating voiceover narration with {selected_voice} voice")
-        full_narration = " ".join(script_segments)
-        # Remove punctuation and special characters from the narration for cleaner VoiceOver
-        # Keep common punctuation marks like periods, commas, question marks, exclamation marks
-        cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_narration)
-        
-        # Add a check for empty narration after cleaning
-        if not cleaned_narration.strip():
-            st.warning("Voiceover script became empty after cleaning. Skipping voiceover generation.")
-            voice_path = None
-        else:
-            try:
-                # Run the speech generation model - CHANGED TO 'minimax/speech-02-turbo'
-                voiceover_uri = run_replicate(
-                    "minimax/speech-02-turbo",
-                    {
-                        "text": cleaned_narration,
-                        "voice_id": voice_options[selected_voice],
-                        "emotion": selected_emotion,
-                        "speed": 1.1,
-                        "pitch": 0,
-                        "volume": 1,
-                        "bitrate": 128000,
-                        "channel": "mono",
-                        "sample_rate": 32000,
-                        "language_boost": "English",
-                        "english_normalization": True
-                    },
-                )
-                # Download the generated voiceover
-                voice_path = download_to_file(voiceover_uri, suffix=".mp3")
-
-                # Validate if the downloaded voiceover file is empty or missing
-                if not os.path.exists(voice_path) or os.path.getsize(voice_path) == 0:
-                    st.error("Generated voiceover file is empty or missing. It might not have generated correctly on Replicate's side.")
-                    voice_path = None
-                else:
-                    # Display the voiceover and provide a download button
-                    st.audio(voice_path)
-                    st.download_button("🎙 Download Voiceover", voice_path, "voiceover.mp3")
-
-            except Exception as e:
-                st.error(f"Failed to generate or download voiceover: {e}")
-                voice_path = None # Set to None if generation fails, so it's not used later
-
-    # Step 6: Merge all audio with video
+    # Original Step 6 becomes NEW Step 6: Merge all audio with video
     st.info("Step 6: Merging final audio and video")
     try:
         audio_clips = []
@@ -377,6 +378,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         if voice_path:
             try:
                 voice_clip = AudioFileClip(voice_path)
+                st.write(f"DEBUG: Voiceover clip duration after loading: {voice_clip.duration} seconds (Target: {final_duration})")
                 voice_volume = 1.0
                 voice_clip = voice_clip.volumex(voice_volume)
                 
@@ -384,16 +386,23 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                 if voice_clip.duration > final_duration:
                     # Trim if too long (from the end to preserve beginning)
                     voice_clip = voice_clip.subclip(0, final_duration)
+                    st.write(f"DEBUG: Voiceover trimmed. New duration: {voice_clip.duration} seconds.")
                 elif voice_clip.duration < final_duration:
                     # Pad with silence at the end if too short
-                    from moviepy.audio.AudioClip import AudioArrayClip
+                    from moviepy.audio.AudioClip import AudioArrayClip # Moved here for clarity, though already imported globally
                     sr = int(voice_clip.fps)
                     silence_duration = final_duration - voice_clip.duration
                     # Create silence: (samples, 1) for mono
-                    silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
-                    silence_clip = AudioArrayClip(silence, fps=sr)
-                    voice_clip = concatenate_audioclips([voice_clip, silence_clip])
-                    
+                    # Ensure the silence array is created with the correct shape for moviepy to recognize it as audio
+                    # If audio_clip.duration is 0, this can cause issues. Add a check.
+                    if silence_duration > 0 and sr > 0:
+                        silence = np.zeros((int(silence_duration * sr), 1), dtype=np.float32)
+                        silence_clip = AudioArrayClip(silence, fps=sr)
+                        voice_clip = concatenate_audioclips([voice_clip, silence_clip])
+                        st.write(f"DEBUG: Voiceover padded with {silence_duration} seconds of silence. New duration: {voice_clip.duration} seconds.")
+                    else:
+                        st.warning(f"DEBUG: Skipping voiceover padding. Silence duration: {silence_duration}, Sample Rate: {sr}")
+                        
                 audio_clips.append(voice_clip)
             except Exception as e:
                 st.error(f"Error loading or processing voiceover audio clip: {e}")
@@ -403,6 +412,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         if music_path:
             try:
                 music_clip = AudioFileClip(music_path)
+                st.write(f"DEBUG: Music clip duration after loading: {music_clip.duration} seconds (Target: {final_duration})")
                 music_volume = 0.2  # Lower music volume for better voice clarity
                 # Apply fade effects
                 music_clip = music_clip.volumex(music_volume).audio_fadein(0.5).audio_fadeout(2.5)
@@ -415,9 +425,11 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                     music_clip = concatenate_audioclips(music_clips_looped)
                     # Trim to exact duration after looping
                     music_clip = music_clip.subclip(0, final_duration)
+                    st.write(f"DEBUG: Music looped and trimmed. New duration: {music_clip.duration} seconds.")
                 elif music_clip.duration > final_duration:
                     # Trim from beginning to preserve the natural ending
                     music_clip = music_clip.subclip(0, final_duration)
+                    st.write(f"DEBUG: Music trimmed. New duration: {music_clip.duration} seconds.")
                     
                 audio_clips.append(music_clip)
             except Exception as e:
@@ -427,9 +439,12 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         # Composite all audio clips if any exist, otherwise set no audio
         if audio_clips:
             final_audio = CompositeAudioClip(audio_clips)
+            st.write(f"DEBUG: Final composite audio clip duration: {final_audio.duration} seconds.")
             final_video = final_video.set_audio(final_audio)
         else:
             final_video = final_video.set_audio(None) # No audio if nothing was generated
+            st.warning("DEBUG: No audio clips generated for final video.")
+
 
         # Define output path for the final video
         output_path = tempfile.NamedTemporaryFile(delete=False, suffix=".mp4").name
