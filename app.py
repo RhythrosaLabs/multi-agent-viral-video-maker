@@ -40,6 +40,14 @@ MODEL_CONFIGS = {
             "avg_output_tokens_per_run": 700, # Estimated avg output tokens for a script
             "parameters": {}
         },
+        "openai/gpt-4.1": {
+            "name": "GPT-4.1",
+            "model_id": "openai/gpt-4.1",
+            "input_cost_per_million_tokens": 2.00,
+            "output_cost_per_million_tokens": 8.00,
+            "avg_output_tokens_per_run": 700,
+            "parameters": {}
+        },
         "openai/gpt-4.1-nano": {
             "name": "GPT-4.1 Nano",
             "model_id": "openai/gpt-4.1-nano",
@@ -53,6 +61,30 @@ MODEL_CONFIGS = {
             "model_id": "meta-llama/llama-3-8b-instruct",
             "input_cost_per_million_tokens": 0.05,
             "output_cost_per_million_tokens": 0.25,
+            "avg_output_tokens_per_run": 700,
+            "parameters": {}
+        },
+        "anthropic/claude-opus-4": {
+            "name": "Claude Opus 4",
+            "model_id": "anthropic/claude-opus-4",
+            "input_cost_per_million_tokens": 15.00,
+            "output_cost_per_million_tokens": 75.00,
+            "avg_output_tokens_per_run": 700,
+            "parameters": {}
+        },
+        "anthropic/claude-haiku-3.5": {
+            "name": "Claude Haiku 3.5",
+            "model_id": "anthropic/claude-haiku-3.5",
+            "input_cost_per_million_tokens": 0.80,
+            "output_cost_per_million_tokens": 4.00,
+            "avg_output_tokens_per_run": 700,
+            "parameters": {}
+        },
+        "meta/llama-4-maverick-instruct": {
+            "name": "Llama 4 Maverick Instruct",
+            "model_id": "meta/llama-4-maverick-instruct",
+            "input_cost_per_million_tokens": 0.25,
+            "output_cost_per_million_tokens": 0.95,
             "avg_output_tokens_per_run": 700,
             "parameters": {}
         },
@@ -76,7 +108,27 @@ MODEL_CONFIGS = {
             "parameters": {
                 "speed": {"type": "float", "default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1},
             }
-        }
+        },
+        "minimax/speech-02-hd": {
+            "name": "MiniMax Speech-02-HD",
+            "model_id": "minimax/speech-02-hd",
+            # Assuming similar character/second rate as turbo, and 1M chars = $50.00
+            "cost_per_second": 0.000625, # $50 / 1M chars * 12.5 chars/sec (approx)
+            "parameters": {
+                "speed": {"type": "float", "default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1},
+                "pitch": {"type": "float", "default": 0.0, "min": -10.0, "max": 10.0, "step": 0.5},
+                "volume": {"type": "float", "default": 1.0, "min": 0.0, "max": 2.0, "step": 0.1},
+            }
+        },
+        "replicate/openvoice-v2": {
+            "name": "OpenVoice v2",
+            "model_id": "replicate/openvoice-v2",
+            "cost_per_run": 0.00833, # $8.33 / 1000 runs (approx)
+            "parameters": {
+                "speed": {"type": "float", "default": 1.0, "min": 0.5, "max": 2.0, "step": 0.1},
+                # OpenVoice also has language parameter, but it's complex with codes. Skipping for now.
+            }
+        },
     },
     "video": {
         "luma/ray-flash-2-540p": {
@@ -107,13 +159,30 @@ MODEL_CONFIGS = {
                 "fps": {"type": "int", "default": 24, "min": 10, "max": 30, "step": 1},
                 "num_inference_steps": {"type": "int", "default": 50, "min": 20, "max": 100, "step": 5},
             }
-        }
+        },
+        "google/veo-2": {
+            "name": "Google Veo 2",
+            "model_id": "google/veo-2",
+            "cost_per_second": 0.50, # Direct cost per second
+            "parameters": {
+                "fps": {"type": "int", "default": 24, "min": 10, "max": 30, "step": 1},
+                "quality": {"type": "int", "default": 7, "min": 1, "max": 10, "step": 1},
+            }
+        },
+        "wan-video/wan-2.1-1.3b": {
+            "name": "WAN 2.1 1.3B",
+            "model_id": "wan-video/wan-2.1-1.3b",
+            "cost_per_video_segment": 0.20, # Direct cost per video (5s video)
+            "parameters": {
+                # No specific parameters mentioned on Replicate for WAN 2.1 1.3B beyond prompt
+            }
+        },
     },
     "music": {
         "google/lyria-2": {
             "name": "Google Lyria 2",
             "model_id": "google/lyria-2",
-            "cost_per_second": 0.01, # Placeholder, direct pricing not found, estimating low cost
+            "cost_per_second": 0.002, # Direct pricing from search
             "parameters": {}
         },
         "meta/musicgen": {
@@ -122,7 +191,15 @@ MODEL_CONFIGS = {
             "cost_per_run": 0.085, # Direct cost per run
             "parameters": {
                 "duration": {"type": "float", "default": 10.0, "min": 1.0, "max": 30.0, "step": 1.0},
-                "model_version": {"type": "str", "default": "melody", "options": ["melody", "large"]},
+                "model_version": {"type": "str", "default": "melody", "options": ["melody", "large", "stereo-melody-large", "stereo-large"]}, # Added more options
+            }
+        },
+        "lucataco/ace-step": {
+            "name": "ACE-Step",
+            "model_id": "lucataco/ace-step",
+            "cost_per_run": 0.085, # Estimating similar to MusicGen, as no direct pricing found
+            "parameters": {
+                # No explicit parameters mentioned on Replicate for ACE-Step beyond prompt
             }
         },
     }
@@ -135,6 +212,83 @@ replicate_api_key = st.text_input("Enter your Replicate API Key", type="password
 video_topic_raw = st.text_input("Enter a video topic (e.g., 'Why the Earth rotates' for Educational, 'New running shoes' for Advertisement, 'A dystopian future' for Movie Trailer)")
 # Sanitize video_topic immediately after input to prevent UnicodeEncodeError in API calls
 video_topic = sanitize_for_api(video_topic_raw)
+
+# --- Determine video parameters (total duration and number of segments) based on selected length ---
+# This block is moved up to ensure these variables are defined before being used.
+video_length_option_key = "video_length_option_pre_select"
+if video_length_option_key not in st.session_state:
+    st.session_state[video_length_option_key] = "20 seconds" # Default value
+
+video_length_option = st.selectbox(
+    "Video Length:",
+    ["10 seconds", "15 seconds", "20 seconds"],
+    index=["10 seconds", "15 seconds", "20 seconds"].index(st.session_state[video_length_option_key]),
+    key=video_length_option_key,
+    help="Select the desired total length of your video."
+)
+
+total_video_duration = 0
+num_segments = 0
+script_prompt_template = ""
+video_visual_style_prompt = ""
+music_style_prompt = ""
+
+base_script_prompt_template = ""
+if video_length_option == "10 seconds":
+    num_segments = 2
+    total_video_duration = 10
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', and '2:'. "
+elif video_length_option == "15 seconds":
+    num_segments = 3
+    total_video_duration = 15
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', and '3:'. "
+else: # Default to 20 seconds
+    num_segments = 4
+    total_video_duration = 20
+    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', '3:', and '4:'. "
+
+# Adjust prompts based on video category
+video_category_options = ["Educational", "Advertisement", "Movie Trailer"]
+video_category = st.selectbox(
+    "Video Category:",
+    video_category_options,
+    index=video_category_options.index(st.session_state.get("video_category", "Educational")), # Default to Educational
+    key="video_category"
+)
+
+if video_category == "Educational":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
+        f"{base_script_prompt_template}"
+        f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
+        f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
+        f"Write in an, conversational tone that keeps viewers hooked. Avoid generic statements."
+    )
+    video_visual_style_prompt = f"educational video about '{{video_topic}}'. Style: {{video_style.lower()}}, clean, professional, well-lit. Camera movement: smooth, purposeful. No text overlays."
+    music_style_prompt = f"Background music for a cohesive, {total_video_duration}-second educational video about {{video_topic}}. Light, non-distracting, slightly cinematic tone."
+
+elif video_category == "Advertisement":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a compelling, persuasive script for a {total_video_duration}-second **advertisement** about '{{video_topic}}'. "
+        f"{base_script_prompt_template}"
+        f"Focus on benefits, problem-solution, and a clear call to action. Each segment should highlight a key feature, benefit, or evoke a positive emotion. "
+        f"The final segment should include a strong call to action (e.g., 'Learn more at...', 'Buy now!', 'Visit our website!'). "
+        f"Use a professional, enticing, and slightly urgent tone. Avoid generic statements."
+    )
+    video_visual_style_prompt = f"dynamic, visually appealing shots for a product/service advertisement about '{{video_topic}}'. Highlight features. Style: modern, vibrant, clean, commercial-ready. Camera movement: engaging, product-focused. No text overlays."
+    music_style_prompt = f"Upbeat, modern, and catchy background music for a commercial advertisement about {{video_topic}}. Energetic and positive tone."
+
+elif video_category == "Movie Trailer":
+    script_prompt_template = (
+        f"You are an expert video scriptwriter. Write a dramatic, suspenseful script for a {total_video_duration}-second **movie trailer** for a film titled '{{video_topic}}'. "
+        f"{base_script_prompt_template}"
+        f"Each segment should introduce elements of the plot, characters, or rising conflict, building suspense. "
+        f"The final segment should be a compelling, open-ended hook that leaves the audience wanting more. "
+        f"Use evocative language, questions, and a fast-paced, intense tone. Build anticipation."
+    )
+    video_visual_style_prompt = f"epic, dramatic, cinematic shots for a movie trailer about '{{video_topic}}'. Emphasize tension, conflict, character expressions. Style: dark, moody, high-contrast, blockbuster film. Camera movement: intense, sweeping, purposeful. No text overlays."
+    music_style_prompt = f"Dramatic, suspenseful, and epic background music for a movie trailer about {{video_topic}}. Build tension and excitement with orchestral elements."
+
 
 # Dictionary mapping display names to Replicate voice IDs for the speech models (fixed for now)
 voice_options = {
@@ -269,7 +423,6 @@ with col_adv3:
     st.markdown(f"**{selected_video_model_name} Parameters**")
     if video_model_config["parameters"]:
         for param_name, details in video_model_config["parameters"].items():
-            # num_frames is now directly handled here for Luma models
             if details["type"] == "float":
                 min_val = float(details["min"])
                 max_val = float(details["max"])
@@ -318,7 +471,7 @@ with col_adv4:
 
 
 # --- Estimated Cost Calculation ---
-def calculate_estimated_cost(total_video_duration, num_segments, selected_text_model_id, selected_speech_model_id, selected_video_model_id, selected_music_model_id, script_prompt_template, video_topic, cleaned_narration=""):
+def calculate_estimated_cost(total_video_duration, num_segments, selected_text_model_id, selected_speech_model_id, selected_video_model_id, selected_music_model_id, script_prompt_template, video_topic, include_voiceover_flag=True, cleaned_narration_content=""):
     cost = 0.0
 
     # Text Model Cost
@@ -333,7 +486,7 @@ def calculate_estimated_cost(total_video_duration, num_segments, selected_text_m
     cost += (estimated_output_tokens / 1_000_000) * text_model_config["output_cost_per_million_tokens"]
 
     # Speech Model Cost
-    if include_voiceover and cleaned_narration: # Only calculate if voiceover is included and not empty
+    if include_voiceover_flag and cleaned_narration_content: # Only calculate if voiceover is included and not empty
         speech_model_config = next(config for config in MODEL_CONFIGS["speech"].values() if config["model_id"] == selected_speech_model_id)
         if "cost_per_second" in speech_model_config:
             # We estimate speech duration as total_video_duration, including the 2s lead-in
@@ -357,6 +510,30 @@ def calculate_estimated_cost(total_video_duration, num_segments, selected_text_m
 
     return cost
 
+# Dictionary mapping display names to Replicate voice IDs for the speech models (fixed for now)
+voice_options = {
+    "Wise Woman": "Wise_Woman",
+    "Friendly Person": "Friendly_Person",
+    "Inspirational Girl": "Inspirational_girl",
+    "Deep Voice Man": "Deep_Voice_Man",
+    "Calm Woman": "Calm_Woman",
+    "Casual Guy": "Casual_Guy",
+    "Lively Girl": "Lively_Girl",
+    "Patient Man": "Patient_Man",
+    "Young Knight": "Young_Knight",
+    "Determined Man": "Determined_Man",
+    "Lovely Girl": "Lovely_Girl",
+    "Decent Boy": "Decent_Boy",
+    "Imposing Manner": "Imposing_Manner",
+    "Elegant Man": "Elegant_Man",
+    "Abbess": "Abbess",
+    "Sweet Girl 2": "Sweet_Girl_2",
+    "Exuberant Girl": "Exuberant_Girl"
+}
+
+# List of available emotion options for the voiceover
+emotion_options = ["auto", "happy", "sad", "angry", "surprised", "fearful", "disgusted"]
+
 # Calculate estimated cost dynamically
 # Need a placeholder for cleaned_narration to pass to cost calculation
 temp_cleaned_narration = "This is a placeholder for narration to estimate costs."
@@ -369,7 +546,8 @@ estimated_cost = calculate_estimated_cost(
     selected_music_model_id,
     script_prompt_template,
     video_topic,
-    temp_cleaned_narration if include_voiceover else ""
+    st.session_state.get("include_voiceover", True), # Pass the state of the checkbox
+    temp_cleaned_narration if st.session_state.get("include_voiceover", True) else ""
 )
 st.metric("Estimated Cost", f"${estimated_cost:.4f}") # Display estimated cost
 
@@ -395,21 +573,22 @@ st.subheader("Video Settings")
 col1, col2, col3 = st.columns(3)
 
 with col1:
-    video_category = st.selectbox(
-        "Video Category:",
-        ["Educational", "Advertisement", "Movie Trailer"],
-        help="Choose the category for your video, influencing script and visual style."
-    )
-    
+    # video_category is defined above now
+    video_style_options = ["Documentary", "Cinematic", "Educational", "Modern", "Nature", "Scientific"]
     video_style = st.selectbox(
         "Video Style:",
-        ["Documentary", "Cinematic", "Educational", "Modern", "Nature", "Scientific"],
+        video_style_options,
+        index=video_style_options.index(st.session_state.get("video_style", "Documentary")),
+        key="video_style",
         help="Choose the visual style for your video"
     )
 
+    aspect_ratio_options = ["16:9", "9:16", "1:1", "4:3"]
     aspect_ratio = st.selectbox(
         "Video Dimensions:",
-        ["16:9", "9:16", "1:1", "4:3"],
+        aspect_ratio_options,
+        index=aspect_ratio_options.index(st.session_state.get("aspect_ratio", "16:9")),
+        key="aspect_ratio",
         help="Choose aspect ratio for your video"
     )
 
@@ -417,7 +596,8 @@ with col2:
     # num_frames_option removed from here as it's now part of Luma model's dynamic params
     enable_loop = st.checkbox(
         "Loop video segments",
-        value=False,
+        value=st.session_state.get("enable_loop", False),
+        key="enable_loop",
         help="Make video segments loop smoothly"
     )
 
@@ -425,14 +605,16 @@ with col3:
     selected_voice = st.selectbox(
         "Voice (for MiniMax Speech-02-Turbo):",
         options=list(voice_options.keys()),
-        index=0,
+        index=list(voice_options.keys()).index(st.session_state.get("selected_voice", "Wise Woman")),
+        key="selected_voice",
         help="Select the voice that will narrate your video"
     )
 
     selected_emotion = st.selectbox(
         "Voice emotion (for MiniMax Speech-02-Turbo):",
         options=emotion_options,
-        index=0,
+        index=emotion_options.index(st.session_state.get("selected_emotion", "auto")),
+        key="selected_emotion",
         help="Select the emotional tone for the voiceover"
     )
 
@@ -440,85 +622,10 @@ with col3:
 st.subheader("Audio Settings")
 col_audio1, col_audio2 = st.columns(2)
 with col_audio1:
-    include_voiceover = st.checkbox("Include VoiceOver", value=True, help="Check to include a generated voiceover narration in your video.")
+    include_voiceover = st.checkbox("Include VoiceOver", value=st.session_state.get("include_voiceover", True), key="include_voiceover", help="Check to include a generated voiceover narration in your video.")
 with col_audio2:
-    video_length_option = st.selectbox(
-        "Video Length:",
-        ["10 seconds", "15 seconds", "20 seconds"],
-        index=2, # Default to 20 seconds
-        help="Select the desired total length of your video."
-    )
-
-# Determine video parameters (total duration and number of segments) based on selected length
-total_video_duration = 0
-num_segments = 0
-script_prompt_template = ""
-video_visual_style_prompt = ""
-music_style_prompt = ""
-
-base_script_prompt_template = ""
-if video_length_option == "10 seconds":
-    num_segments = 2
-    total_video_duration = 10
-    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', and '2:'. "
-elif video_length_option == "15 seconds":
-    num_segments = 3
-    total_video_duration = 15
-    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', and '3:'. "
-else: # Default to 20 seconds
-    num_segments = 4
-    total_video_duration = 20
-    base_script_prompt_template = f"The video will be {total_video_duration} seconds long; divide your script into {num_segments} segments of approximately 5 seconds each. Each segment should be approximately 15-25 words, providing detailed and continuous narration to fill its 5-second duration with spoken content, not silence. Label each section clearly as '1:', '2:', '3:', and '4:'. "
-
-# Adjust prompts based on video category
-if video_category == "Educational":
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a clear, engaging, thematically consistent voiceover script for a {total_video_duration}-second educational video titled '{{video_topic}}'. "
-        f"{base_script_prompt_template}"
-        f"Make sure the {num_segments} segments tell a cohesive, progressive story that builds toward a compelling conclusion. "
-        f"Use vivid, concrete language that translates well to visuals. Include specific details, numbers, or comparisons when relevant. "
-        f"Write in an, conversational tone that keeps viewers hooked. Avoid generic statements."
-    )
-    video_visual_style_prompt = f"educational video about '{{video_topic}}'. Style: {video_style.lower()}, clean, professional, well-lit. Camera movement: smooth, purposeful. No text overlays."
-    music_style_prompt = f"Background music for a cohesive, {total_video_duration}-second educational video about {{video_topic}}. Light, non-distracting, slightly cinematic tone."
-
-elif video_category == "Advertisement":
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a compelling, persuasive script for a {total_video_duration}-second **advertisement** about '{{video_topic}}'. "
-        f"{base_script_prompt_template}"
-        f"Focus on benefits, problem-solution, and a clear call to action. Each segment should highlight a key feature, benefit, or evoke a positive emotion. "
-        f"The final segment should include a strong call to action (e.g., 'Learn more at...', 'Buy now!', 'Visit our website!'). "
-        f"Use a professional, enticing, and slightly urgent tone. Avoid generic statements."
-    )
-    video_visual_style_prompt = f"dynamic, visually appealing shots for a product/service advertisement about '{{video_topic}}'. Highlight features. Style: modern, vibrant, clean, commercial-ready. Camera movement: engaging, product-focused. No text overlays."
-    music_style_prompt = f"Upbeat, modern, and catchy background music for a commercial advertisement about {{video_topic}}. Energetic and positive tone."
-
-elif video_category == "Movie Trailer":
-    script_prompt_template = (
-        f"You are an expert video scriptwriter. Write a dramatic, suspenseful script for a {total_video_duration}-second **movie trailer** for a film titled '{{video_topic}}'. "
-        f"{base_script_prompt_template}"
-        f"Each segment should introduce elements of the plot, characters, or rising conflict, building suspense. "
-        f"The final segment should be a compelling, open-ended hook that leaves the audience wanting more. "
-        f"Use evocative language, questions, and a fast-paced, intense tone. Build anticipation."
-    )
-    video_visual_style_prompt = f"epic, dramatic, cinematic shots for a movie trailer about '{{video_topic}}'. Emphasize tension, conflict, character expressions. Style: dark, moody, high-contrast, blockbuster film. Camera movement: intense, sweeping, purposeful. No text overlays."
-    music_style_prompt = f"Dramatic, suspenseful, and epic background music for a movie trailer about {{video_topic}}. Build tension and excitement with orchestral elements."
-
-# --- Camera Movement options ---
-st.subheader("Camera Movement (Optional)")
-camera_concepts = [
-    "static", "zoom_in", "zoom_out", "pan_left", "pan_right",
-    "tilt_up", "tilt_down", "orbit_left", "orbit_right",
-    "push_in", "pull_out", "crane_up", "crane_down",
-    "aerial", "aerial_drone", "handheld", "dolly_zoom"
-]
-
-selected_concepts = st.multiselect(
-    "Choose camera movements (will be applied randomly to segments):",
-    options=camera_concepts,
-    default=["static", "zoom_in", "pan_right"],
-    help="Select camera movements to make your video more dynamic"
-)
+    # video_length_option is defined above now
+    pass # No need for a selectbox here as it's defined globally at the top
 
 
 # --- Main Generation Logic ---
@@ -597,6 +704,20 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                     speech_model_params["text"] = sanitized_narration_text # Text is required for this model
                     if "speed" in advanced_params:
                         speech_model_params["speed"] = advanced_params["speed"]
+                
+                # For MiniMax Speech-02-HD
+                if selected_speech_model_id == "minimax/speech-02-hd":
+                    speech_model_params["voice_id"] = voice_options[selected_voice]
+                    speech_model_params["emotion"] = selected_emotion
+                    speech_model_params["bitrate"] = 128000
+                    speech_model_params["channel"] = "mono"
+                    speech_model_params["sample_rate"] = 32000
+                    speech_model_params["language_boost"] = "English"
+                    speech_model_params["english_normalization"] = True
+
+                # For OpenVoice v2
+                if selected_speech_model_id == "replicate/openvoice-v2":
+                    speech_model_params["speed"] = advanced_params.get("speed", 1.0)
 
 
                 voiceover_uri = run_replicate(
@@ -644,7 +765,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         
         # Default parameters for selected video model if not overridden by user
         if selected_video_model_id == "luma/ray-flash-2-540p":
-            video_model_params.setdefault("num_frames", num_frames) # This 'num_frames' is now from advanced_params
+            video_model_params.setdefault("num_frames", advanced_params.get("num_frames", 120)) # This 'num_frames' is now from advanced_params
             video_model_params.setdefault("fps", 24)
             video_model_params.setdefault("guidance", 3.0)
             video_model_params.setdefault("num_inference_steps", 30)
@@ -656,6 +777,14 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         elif selected_video_model_id == "minimax/video-01-director":
             video_model_params.setdefault("fps", 24)
             video_model_params.setdefault("num_inference_steps", 50)
+        
+        elif selected_video_model_id == "google/veo-2":
+            video_model_params.setdefault("fps", 24)
+            video_model_params.setdefault("quality", 7)
+        
+        elif selected_video_model_id == "wan-video/wan-2.1-1.3b":
+            # No specific advanced parameters to set beyond prompt
+            pass
 
         try:
             video_uri = run_replicate(
@@ -711,6 +840,10 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                 music_model_params["duration"] = advanced_params["duration"]
             if "model_version" in advanced_params:
                 music_model_params["model_version"] = advanced_params["model_version"]
+        
+        elif selected_music_model_id == "lucataco/ace-step":
+            music_model_params.setdefault("prompt", sanitized_music_prompt)
+
 
         music_uri = run_replicate(
             selected_music_model_id,
