@@ -644,19 +644,37 @@ def run_model(model_id, inputs):
     # This is a placeholder for your actual Replicate API call
     # In a real app, you would use replicate.run(model_id, input=inputs)
     st.info(f"Calling model: {model_id} with inputs: {inputs}")
-    # Simulate a response
-    if "text" in model_id:
-        return "1: This is the first segment of your video script. It introduces the topic with engaging language. 2: The second segment continues the narrative, providing more details and keeping the viewer interested. 3: Finally, the third segment concludes the video with a call to action or a summary."
-    elif "speech" in model_id:
+
+    # Determine model type from model_id
+    model_type = None
+    for m_type, configs in MODEL_CONFIGS.items():
+        if any(config["model_id"] == model_id for config in configs.values()):
+            model_type = m_type
+            break
+
+    if model_type == "text":
+        prompt_text = inputs.get("prompt", "")
+        # Adjust simulated response based on the expected number of segments
+        if "4 segments" in prompt_text: # For 20 seconds
+            return "1: The city's towering, moss-covered walls barely hold back the encroaching wild. Yet, something far older stirs beneath. 2: Shadows lengthen, revealing ancient horrors as the ground trembles with a primordial roar. Panic erupts in the neon-lit streets. 3: Humanity's last stand begins, outmatched by colossal, scales-armored beasts. Graffiti-strewn bunkers become fleeting sanctuaries. 4: Can a fractured remnant survive when the very Earth echoes with the thunder of a forgotten age, or is this their final sunset?"
+        elif "3 segments" in prompt_text: # For 15 seconds
+            return "1: This is the first segment of your video script. It introduces the topic with engaging language. 2: The second segment continues the narrative, providing more details and keeping the viewer interested. 3: Finally, the third segment concludes the video with a call to action or a summary."
+        else: # Default for 2 segments (10 seconds)
+            return "1: This is the first segment of your video script. It introduces the topic with engaging language. 2: The second segment continues the narrative, providing more details and keeping the viewer interested."
+    elif model_type == "speech":
         # Simulate an audio URL
         return "https://replicate.delivery/pbxt/C4R3Yk8g1gR2z0W4m5x5X6j/output.mp3"
-    elif "video" in model_id:
-        # Simulate video URLs for each segment
+    elif model_type == "video":
+        # Simulate video URLs for each segment. Ensure enough for 4 segments if needed.
         return ["https://replicate.delivery/pbxt/video1.mp4", "https://replicate.delivery/pbxt/video2.mp4", "https://replicate.delivery/pbxt/video3.mp4", "https://replicate.delivery/pbxt/video4.mp4"]
-    elif "music" in model_id:
+    elif model_type == "music":
         # Simulate a music URL
         return "https://replicate.delivery/pbxt/music.mp3"
+    
+    # Fallback for unexpected model_id
+    st.warning(f"run_model: Unknown model_id or model_type: {model_id}. Returning generic simulated output.")
     return "Simulated output"
+
 
 def download_file(url, filename):
     response = requests.get(url, stream=True)
@@ -856,4 +874,3 @@ if st.button("🚀 **Generate My Video!**", type="primary", use_container_width=
 
 st.markdown("---")
 st.caption("Powered by Replicate AI models | Developed with Streamlit")
-
