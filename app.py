@@ -662,14 +662,16 @@ def run_model(model_id, inputs):
         else: # Default for 2 segments (10 seconds)
             return "1: This is the first segment of your video script. It introduces the topic with engaging language. 2: The second segment continues the narrative, providing more details and keeping the viewer interested."
     elif model_type == "speech":
-        # Simulate an audio URL
-        return "https://replicate.delivery/pbxt/C4R3Yk8g1gR2z0W4m5x5X6j/output.mp3"
+        # Simulate an audio URL with a more stable public link
+        return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3"
     elif model_type == "video":
-        # Simulate video URLs for each segment. Ensure enough for 4 segments if needed.
-        return ["https://replicate.delivery/pbxt/video1.mp4", "https://replicate.delivery/pbxt/video2.mp4", "https://replicate.delivery/pbxt/video3.mp4", "https://replicate.delivery/pbxt/video4.mp4"]
+        # Simulate video URLs for each segment with a stable public link
+        # Assuming we need 4 segments for a 20-second video, and each will use the same dummy video
+        num_video_segments_expected = inputs.get('num_frames', 120) // inputs.get('fps', 24) // 5 # simplified estimation
+        return ["https://www.w3schools.com/html/mov_bbb.mp4"] * num_segments # Use num_segments to match generated video segments
     elif model_type == "music":
-        # Simulate a music URL
-        return "https://replicate.delivery/pbxt/music.mp3"
+        # Simulate a music URL with a more stable public link
+        return "https://www.soundhelix.com/examples/mp3/SoundHelix-Song-2.mp3"
     
     # Fallback for unexpected model_id
     st.warning(f"run_model: Unknown model_id or model_type: {model_id}. Returning generic simulated output.")
@@ -678,7 +680,7 @@ def run_model(model_id, inputs):
 
 def download_file(url, filename):
     response = requests.get(url, stream=True)
-    response.raise_for_status()
+    response.raise_for_status() # This is the line that will raise HTTPError for a 404
     with open(filename, 'wb') as f:
         for chunk in response.iter_content(chunk_size=8192):
             f.write(chunk)
