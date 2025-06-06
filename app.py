@@ -6,7 +6,7 @@ import requests
 import re
 from moviepy.editor import (
     VideoFileClip,
-    concatenate_videoclips,
+    concatenate_videoclip, # Changed concatenate_videoclips to concatenate_videoclip
     AudioFileClip,
     CompositeAudioClip,
     concatenate_audioclips,
@@ -222,7 +222,7 @@ if video_length_option_key not in st.session_state:
 video_length_option = st.selectbox(
     "Video Length:",
     ["10 seconds", "15 seconds", "20 seconds"],
-    index=["10 seconds", "15 seconds", "20 seconds"].index(st.session_state[video_length_option_key]),
+    # Removed 'index' parameter, now relying solely on session_state for value
     key=video_length_option_key,
     help="Select the desired total length of your video."
 )
@@ -674,7 +674,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     if include_voiceover:
         st.info(f"Step 2: Generating voiceover narration with {selected_voice} voice using {selected_speech_model_name}")
         full_narration = " ".join(script_segments)
-        cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_narration)
+        cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_naration)
         
         if not cleaned_narration.strip():
             st.warning("Voiceover script became empty after cleaning. Skipping voiceover generation.")
@@ -809,7 +809,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     # Step 4: Concatenate video segments first
     st.info("Step 4: Combining video segments")
     try:
-        final_video = concatenate_videoclips(segment_clips, method="compose")
+        final_video = concatenate_videoclip(segment_clips, method="compose") # Changed to concatenate_videoclip
         final_video = final_video.set_duration(total_video_duration)
         final_duration = final_video.duration
         st.success(f"Video segments combined - Total duration: {final_duration} seconds")
@@ -818,7 +818,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         st.stop()
 
     # Step 5: Generate background music
-    st.info(f"Step 5: Creating background music using {selected_music_model_name}")
+    st.info("Step 5: Creating background music using {selected_music_model_name}")
     music_path = None
     try:
         sanitized_music_prompt = sanitize_for_api(music_style_prompt.format(video_topic=video_topic))
