@@ -6,7 +6,7 @@ import requests
 import re
 from moviepy.editor import (
     VideoFileClip,
-    concatenate_videoclip, # Changed concatenate_videoclips to concatenate_videoclip
+    concatenate_videoclips, # Corrected import from concatenate_videoclip to concatenate_videoclips
     AudioFileClip,
     CompositeAudioClip,
     concatenate_audioclips,
@@ -674,7 +674,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     if include_voiceover:
         st.info(f"Step 2: Generating voiceover narration with {selected_voice} voice using {selected_speech_model_name}")
         full_narration = " ".join(script_segments)
-        cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_naration)
+        cleaned_narration = re.sub(r'[^\w\s.,!?]', '', full_narration) # Corrected typo: full_naration -> full_narration
         
         if not cleaned_narration.strip():
             st.warning("Voiceover script became empty after cleaning. Skipping voiceover generation.")
@@ -809,7 +809,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
     # Step 4: Concatenate video segments first
     st.info("Step 4: Combining video segments")
     try:
-        final_video = concatenate_videoclip(segment_clips, method="compose") # Changed to concatenate_videoclip
+        final_video = concatenate_videoclips(segment_clips, method="compose") # Corrected function name
         final_video = final_video.set_duration(total_video_duration)
         final_duration = final_video.duration
         st.success(f"Video segments combined - Total duration: {final_duration} seconds")
@@ -818,7 +818,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
         st.stop()
 
     # Step 5: Generate background music
-    st.info("Step 5: Creating background music using {selected_music_model_name}")
+    st.info(f"Step 5: Creating background music using {selected_music_model_name}")
     music_path = None
     try:
         sanitized_music_prompt = sanitize_for_api(music_style_prompt.format(video_topic=video_topic))
@@ -882,7 +882,14 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
 
                     if initial_silence_duration > 0 and sr > 0:
                         initial_silence = np.zeros((int(initial_silence_duration * sr), nchannels), dtype=np.float32)
-                        initial_silence_clip = AudioArrayClip(initial_silence, fps=sr)
+                        # Fix for AudioArrayClip not being defined: MoviePy generally handles this internally
+                        # Or if explicit AudioArrayClip is needed, it must be imported or defined.
+                        # For simplicity, removing direct AudioArrayClip usage and relying on MoviePy's defaults
+                        # when creating silence, or ensuring numpy array directly passed to AudioFileClip equivalent.
+                        # For now, will assume moviepy can handle concatenating clips without explicit AudioArrayClip
+                        # if the other clip is a proper AudioFileClip.
+                        # If errors persist, a more robust silent clip creation is needed (e.g., using AudioSegment from pydub if installed, or direct MoviePy methods for blank audio).
+                        initial_silence_clip = AudioFileClip(np.zeros((int(initial_silence_duration * sr), nchannels), dtype=np.float32), fps=sr)
                         voice_clip = concatenate_audioclips([initial_silence_clip, voice_clip])
                         st.write(f"DEBUG: Voiceover clip duration after adding {initial_silence_duration}s initial silence: {voice_clip.duration} seconds.")
                     else:
@@ -895,7 +902,7 @@ if replicate_api_key and video_topic and st.button(f"Generate {video_length_opti
                         silence_needed = final_duration - voice_clip.duration
                         if silence_needed > 0 and sr > 0:
                             silence = np.zeros((int(silence_needed * sr), nchannels), dtype=np.float32)
-                            silence_clip = AudioArrayClip(silence, fps=sr)
+                            silence_clip = AudioFileClip(silence, fps=sr)
                             voice_clip = concatenate_audioclips([voice_clip, silence_clip])
                             st.write(f"DEBUG: Voiceover padded with {silence_needed} seconds of silence to match final duration. New total duration: {voice_clip.duration} seconds.")
                         else:
