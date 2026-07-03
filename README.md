@@ -88,3 +88,8 @@ The app will:
 app.py                  # Main Streamlit app
 requirements.txt        # Python dependencies
 README.md               # You're here!
+
+
+## Support
+
+If you find this useful, consider supporting via [PayPal](https://paypal.me/noodlebake)
