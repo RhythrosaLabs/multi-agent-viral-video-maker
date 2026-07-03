@@ -1,95 +1,67 @@
+<div align="center">
+
 # 🎬 AI Multi-Agent Video Creator
 
-Explore the UI:
+**Multi-agent pipeline for creating longform HD videos with music, voiceover, and cinematic visuals**
 
-https://viral-video-maker.streamlit.app
+![Python](https://img.shields.io/badge/Python-3776AB?style=flat&logo=python&logoColor=white)
+![Streamlit](https://img.shields.io/badge/Streamlit-FF4B4B?style=flat&logo=streamlit&logoColor=white)
+![Replicate](https://img.shields.io/badge/Replicate-000000?style=flat)
+![License](https://img.shields.io/badge/License-MIT-green?style=flat)
 
+🌐 **[Live Demo → viral-video-maker.streamlit.app](https://viral-video-maker.streamlit.app)**
 
-A powerful and flexible web app built with **Streamlit**, **Replicate**, and **MoviePy** that enables you to generate short educational or cinematic videos automatically. Simply enter a topic, configure settings, and let AI agents handle everything from scriptwriting to video generation and narration.
-
----
-
-## 🚀 Features
-
-- ✍️ **Script Generation** using Claude-4 Sonnet
-- 🎤 **Voiceover Narration** using Minimax Speech O2
-- 🎥 **Visual Scene Creation** using Luma Ray 2
-- 🎹 **Background Music** using Google Lyria
-- 🔊 **Optional Voiceover and Audio Mixing**
-- 🖼️ **Customizable Video Styles** (Documentary, Cinematic, Nature, etc.)
-- 📐 **Aspect Ratios:** 16:9, 9:16, 1:1, 4:3
-- 🎚️ **Video Lengths:** 10s, 15s, or 20s
-- 🕹️ **Camera Motions:** Randomized movements like zooms, pans, orbit, etc.
-- 📁 **Downloadable Scripts** and assets
-- 🧠 **Multi-Agent Pipeline:** Modular architecture for flexibility and future extensions
+</div>
 
 ---
 
-## 🛠️ Installation
+A multi-agent video production pipeline. Enter a topic, configure the style, and let specialized AI agents handle every step: scriptwriting, visual scene generation, TTS narration, background music, and final video assembly — all the way to a downloadable MP4.
 
-1. **Clone the repository**
+## ✨ Features
+
+- **Script Generation** — Claude Sonnet writes a structured, narrated script
+- **Voiceover Narration** — Minimax Speech O2 TTS with multiple voice options
+- **Visual Scene Creation** — Luma Ray 2 generates cinematic video clips per scene
+- **Background Music** — Google Lyria generates original background tracks
+- **Audio Mixing** — optional voiceover + music blending
+- **Customizable Styles** — Documentary, Cinematic, Nature, and more
+- **Aspect Ratios** — 16:9, 9:16, 1:1, 4:3
+- **Video Lengths** — 10s, 15s, or 20s
+- **Camera Motions** — randomized zooms, pans, orbit, and more
+- **Downloadable Scripts** — export the generated script separately
+
+## 🚀 Quick Start
 
 ```bash
-git clone https://github.com/yourusername/ai-multi-agent-video-creator.git
-cd ai-multi-agent-video-creator
-```
-
-2. **Install dependencies**
-
-It is typically best practice to use a virtual environment:
-
-```bash
-python -m venv venv
-source venv/bin/activate  # on Windows: venv\Scripts\activate
+git clone https://github.com/RhythrosaLabs/multi-agent-viral-video-maker.git
+cd multi-agent-viral-video-maker
 pip install -r requirements.txt
-```
-
-3. **Set up your Replicate API key**
-
-You can get your API key from [replicate.com/account](https://replicate.com/account).
-
----
-
-## 📄 Usage
-
-Run the app with:
-
-```bash
 streamlit run app.py
 ```
 
-Then:
+Or try the [live demo](https://viral-video-maker.streamlit.app).
 
-1. Enter your **Replicate API key**.
-2. Input a **video topic** (e.g., `"Why the Earth rotates"`).
-3. Customize:
-   - Voice
-   - Emotion
-   - Video style, aspect ratio, quality
-   - Duration and looping
-   - Camera motion
-4. Click **"Generate Video"**.
+## 🛠️ Tech Stack
 
-The app will:
-- Write a script using Claude-4 Sonnet
-- Generate scenes for each script segment
-- Add voiceover narration (optional)
-- Compose and add music
-- Concatenate video and audio into one final video
-- Let you download the full video and all individual elements (such as script, voiceover, music, etc.)
+- **Python + Streamlit** — web app and pipeline orchestration
+- **Anthropic Claude** — script generation
+- **Replicate** — Luma Ray 2 (video), Google Lyria (music)
+- **Minimax Speech** — TTS narration
+- **MoviePy** — video assembly and audio mixing
 
+## 🤝 Contributing
 
+PRs welcome. Open an issue first for major changes.
+
+## 📄 License
+
+MIT
+
+## 💛 Support
+
+If this pipeline helps you create content, consider supporting development:
+
+👉 [Donate via PayPal](https://paypal.me/noodlebake) — @noodlebake
 
 ---
-
-## 📁 File Structure
-
-```plaintext
-app.py                  # Main Streamlit app
-requirements.txt        # Python dependencies
-README.md               # You're here!
-
-
-## Support
-
-If you find this useful, consider supporting via [PayPal](https://paypal.me/noodlebake)
+<div align="center">Made with ❤️ by <a href="https://github.com/RhythrosaLabs">RhythrosaLabs</a></div>
