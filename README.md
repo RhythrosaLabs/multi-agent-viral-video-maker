@@ -11,7 +11,7 @@
 
 🌐 **[Live Demo → viral-video-maker.streamlit.app](https://viral-video-maker.streamlit.app)**
 
-<img src="assets/demo/mavvm-demo.gif" width="100%" alt="Multi-Agent Viral Video Maker: script, voice, music and video agents producing a finished longform video">
+<img src="https://github.com/RhythrosaLabs/multi-agent-viral-video-maker/raw/main/assets/demo/mavvm-demo.gif" width="100%" alt="Multi-Agent Viral Video Maker: script, voice, music and video agents producing a finished longform video">
 
 </div>
 
